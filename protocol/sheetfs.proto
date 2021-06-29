@@ -1,0 +1,123 @@
+syntax = "proto3";
+
+option go_package = "github.com/fourstring/sheetfs/protocol;fs_rpc";
+
+package sheetfs;
+
+message Empty {};
+
+service MasterNode {
+    rpc CreateSheet(CreateSheetRequest) returns (CreateSheetReply) {}
+    rpc DeleteSheet(DeleteSheetRequest) returns (DeleteSheetReply) {}
+    rpc OpenSheet(OpenSheetRequest) returns (OpenSheetReply) {}
+    rpc ReadCell(ReadCellRequest) returns (ReadCellReply) {}
+    rpc WriteCell(WriteCellRequest) returns (WriteCellReply) {}
+    rpc CommitCell(CommitCellRequest) returns (CommitCellReply) {}
+}
+
+service DataNode {
+    rpc ReadChunk(ReadChunkRequest) returns (ReadChunkReply) {}
+    rpc WriteChunk(WriteChunkRequest) returns (WriteChunkReply) {}
+}
+
+enum Status {
+    OK = 0;
+    Exist = 1;
+    NotFound = 2;
+    WrongVersion = 3;
+}
+
+message CreateSheetRequest {
+    string filename = 1;
+}
+
+message CreateSheetReply {
+    Status status = 1;
+}
+
+message DeleteSheetRequest {
+    string filename = 1;
+}
+
+message DeleteSheetReply {
+    Status status = 1;
+}
+
+message OpenSheetRequest {
+    string filename = 1;
+}
+
+message Chunk {
+    uint64 id = 1;
+    string datanode = 2;
+    uint64 version = 3;
+}
+
+message OpenSheetReply {
+    Status status = 1;
+    repeated Chunk chunks = 2;
+    uint64 fd = 3;
+}
+
+message Cell {
+    Chunk chunk = 1;
+    uint64 offset = 2;
+    uint64 size = 3;
+}
+
+message ReadCellRequest {
+    uint64 fd = 1;
+    uint64 row = 2;
+    uint64 column = 3;
+}
+
+message ReadCellReply {
+    Status status = 1;
+    Cell cell = 2;
+}
+
+message WriteCellRequest {
+    uint64 fd = 1;
+    uint64 row = 2;
+    uint64 column = 3;
+}
+
+message WriteCellReply {
+    Status status = 1;
+    Cell cell = 2;
+}
+
+message CommitCellRequest {
+    uint64 fd = 1;
+    uint64 row = 2;
+    uint64 column = 3;
+    uint64 version = 4;
+}
+
+message CommitCellReply {
+    Status status = 1;
+}
+
+message ReadChunkRequest {
+    uint64 id = 1;
+    uint64 offset = 2;
+    uint64 size = 3;
+    uint64 version = 4;
+}
+
+message ReadChunkReply {
+    Status status = 1;
+    bytes data = 2;
+}
+
+message WriteChunkRequest {
+    uint64 id = 1;
+    uint64 offset = 2;
+    uint64 size = 3;
+    uint64 version = 4;
+    bytes data = 5;
+}
+
+message WriteChunkReply {
+    Status status = 1;
+}
