@@ -67,8 +67,8 @@ message Cell {
 
 message ReadCellRequest {
     uint64 fd = 1;
-    uint64 row = 2;
-    uint64 column = 3;
+    uint32 row = 2;
+    uint32 column = 3;
 }
 
 message ReadCellReply {
@@ -78,8 +78,8 @@ message ReadCellReply {
 
 message WriteCellRequest {
     uint64 fd = 1;
-    uint64 row = 2;
-    uint64 column = 3;
+    uint32 row = 2;
+    uint32 column = 3;
 }
 
 message WriteCellReply {
@@ -89,8 +89,8 @@ message WriteCellReply {
 
 message CommitCellRequest {
     uint64 fd = 1;
-    uint64 row = 2;
-    uint64 column = 3;
+    uint32 row = 2;
+    uint32 column = 3;
     uint64 version = 4;
 }
 
