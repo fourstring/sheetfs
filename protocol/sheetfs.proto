@@ -10,6 +10,9 @@ service MasterNode {
     rpc CreateSheet(CreateSheetRequest) returns (CreateSheetReply) {}
     rpc DeleteSheet(DeleteSheetRequest) returns (DeleteSheetReply) {}
     rpc OpenSheet(OpenSheetRequest) returns (OpenSheetReply) {}
+    rpc RecycleSheet(RecycleSheetRequest) returns (RecycleSheetReply) {}
+    rpc ResumeSheet(ResumeSheetRequest) returns (ResumeSheetReply) {}
+    rpc ListSheets(Empty) returns (ListSheetsReply) {}
     rpc ReadCell(ReadCellRequest) returns (ReadCellReply) {}
     rpc WriteCell(WriteCellRequest) returns (WriteCellReply) {}
     rpc CommitCell(CommitCellRequest) returns (CommitCellReply) {}
@@ -57,6 +60,32 @@ message OpenSheetReply {
     Status status = 1;
     repeated Chunk chunks = 2;
     uint64 fd = 3;
+}
+
+message RecycleSheetRequest {
+    string filename = 1;
+}
+
+message RecycleSheetReply {
+    Status status = 1;
+}
+
+message ResumeSheetRequest {
+    string filename = 1;
+}
+
+message ResumeSheetReply {
+    Status status = 1;
+}
+
+message Sheet {
+    string filename = 1;
+    bool recycled = 2;
+}
+
+message ListSheetsReply {
+    Status status = 1;
+    repeated Sheet sheets = 2;
 }
 
 message Cell {
@@ -115,7 +144,8 @@ message WriteChunkRequest {
     uint64 offset = 2;
     uint64 size = 3;
     uint64 version = 4;
-    bytes data = 5;
+    string padding = 5;
+    bytes data = 6;
 }
 
 message WriteChunkReply {
