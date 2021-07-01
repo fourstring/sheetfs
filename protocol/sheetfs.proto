@@ -38,6 +38,7 @@ message CreateSheetRequest {
 
 message CreateSheetReply {
     Status status = 1;
+    uint64 fd = 2;
 }
 
 message DeleteSheetRequest {
