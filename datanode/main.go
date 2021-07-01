@@ -14,6 +14,16 @@ type server struct {
 	fsrpc.UnimplementedDataNodeServer
 }
 
+func (s *server) DeleteChunk(ctx context.Context, request *fsrpc.DeleteChunkRequest) (*fsrpc.DeleteChunkReply, error) {
+	reply := new(fsrpc.DeleteChunkReply)
+	reply.Status = fsrpc.Status_OK
+	err := os.Remove(getFilename(request.Id))
+	if err != nil {
+		print("not delete")
+	}
+	return reply, nil
+}
+
 func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest) (*fsrpc.ReadChunkReply, error) {
 	reply := new(fsrpc.ReadChunkReply)
 
@@ -21,6 +31,7 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 
 	// this file does not exist
 	if err != nil {
+		file.Close()
 		reply.Status = fsrpc.Status_NotFound
 		return reply, err
 	}
@@ -31,6 +42,7 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 		// the version is correct
 		data := make([]byte, request.Size)
 		_, err = file.ReadAt(data, int64(request.Offset))
+		file.Close()
 
 		// can not read data at this pos
 		if err != nil {
@@ -41,6 +53,7 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 		reply.Data = data
 		reply.Status = fsrpc.Status_Exist
 	} else {
+		file.Close()
 		reply.Status = fsrpc.Status_WrongVersion
 		return reply, nil
 	}
@@ -81,6 +94,7 @@ func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 		_, err := file.WriteAt(getPaddedData(request.Data, request.Size, request.Padding),
 			int64(request.Offset))
 		if err != nil {
+			file.Close()
 			reply.Status = fsrpc.Status_NotFound
 			return reply, nil
 		}
@@ -92,6 +106,7 @@ func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 		return reply, nil
 	} else {
 		// some backup write
+		file.Close()
 		reply.Status = fsrpc.Status_WrongVersion
 		return reply, nil
 	}

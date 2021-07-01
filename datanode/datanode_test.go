@@ -57,6 +57,18 @@ func TestDatanode(t *testing.T) {
 	if string(readRes.Data) != "this is the new test data" {
 		t.Error("wrong")
 	}
+
+	deleteReq := fsrpc.DeleteChunkRequest{Id: 1}
+	deleteRes, _ := s.DeleteChunk(context.Background(), &deleteReq)
+	if deleteRes.Status != fsrpc.Status_OK {
+		t.Error("wrong")
+	}
+
+	readReq = fsrpc.ReadChunkRequest{Id: 1, Size: 25, Version: 2}
+	readRes, _ = s.ReadChunk(context.Background(), &readReq)
+	if readRes.Status != fsrpc.Status_NotFound {
+		t.Error("wrong")
+	}
 }
 
 func TestDatanodeParallel(t *testing.T) {
