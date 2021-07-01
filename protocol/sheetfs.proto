@@ -10,6 +10,7 @@ service MasterNode {
     rpc CreateSheet(CreateSheetRequest) returns (CreateSheetReply) {}
     rpc DeleteSheet(DeleteSheetRequest) returns (DeleteSheetReply) {}
     rpc OpenSheet(OpenSheetRequest) returns (OpenSheetReply) {}
+    rpc ReadSheet(ReadSheetRequest) returns (ReadSheetReply) {}
     rpc RecycleSheet(RecycleSheetRequest) returns (RecycleSheetReply) {}
     rpc ResumeSheet(ResumeSheetRequest) returns (ResumeSheetReply) {}
     rpc ListSheets(Empty) returns (ListSheetsReply) {}
@@ -59,8 +60,16 @@ message Chunk {
 
 message OpenSheetReply {
     Status status = 1;
+    uint64 fd = 2;
+}
+
+message ReadSheetRequest {
+    uint64 fd = 1;
+}
+
+message ReadSheetReply {
+    Status status = 1;
     repeated Chunk chunks = 2;
-    uint64 fd = 3;
 }
 
 message RecycleSheetRequest {
