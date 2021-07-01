@@ -394,6 +394,7 @@ var MasterNode_ServiceDesc = grpc.ServiceDesc{
 type DataNodeClient interface {
 	ReadChunk(ctx context.Context, in *ReadChunkRequest, opts ...grpc.CallOption) (*ReadChunkReply, error)
 	WriteChunk(ctx context.Context, in *WriteChunkRequest, opts ...grpc.CallOption) (*WriteChunkReply, error)
+	DeleteChunk(ctx context.Context, in *DeleteChunkRequest, opts ...grpc.CallOption) (*DeleteChunkReply, error)
 }
 
 type dataNodeClient struct {
@@ -422,12 +423,22 @@ func (c *dataNodeClient) WriteChunk(ctx context.Context, in *WriteChunkRequest, 
 	return out, nil
 }
 
+func (c *dataNodeClient) DeleteChunk(ctx context.Context, in *DeleteChunkRequest, opts ...grpc.CallOption) (*DeleteChunkReply, error) {
+	out := new(DeleteChunkReply)
+	err := c.cc.Invoke(ctx, "/sheetfs.DataNode/DeleteChunk", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
 // DataNodeServer is the server API for DataNode service.
 // All implementations must embed UnimplementedDataNodeServer
 // for forward compatibility
 type DataNodeServer interface {
 	ReadChunk(context.Context, *ReadChunkRequest) (*ReadChunkReply, error)
 	WriteChunk(context.Context, *WriteChunkRequest) (*WriteChunkReply, error)
+	DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkReply, error)
 	mustEmbedUnimplementedDataNodeServer()
 }
 
@@ -440,6 +451,9 @@ func (UnimplementedDataNodeServer) ReadChunk(context.Context, *ReadChunkRequest)
 }
 func (UnimplementedDataNodeServer) WriteChunk(context.Context, *WriteChunkRequest) (*WriteChunkReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteChunk not implemented")
+}
+func (UnimplementedDataNodeServer) DeleteChunk(context.Context, *DeleteChunkRequest) (*DeleteChunkReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method DeleteChunk not implemented")
 }
 func (UnimplementedDataNodeServer) mustEmbedUnimplementedDataNodeServer() {}
 
@@ -490,6 +504,24 @@ func _DataNode_WriteChunk_Handler(srv interface{}, ctx context.Context, dec func
 	return interceptor(ctx, in, info, handler)
 }
 
+func _DataNode_DeleteChunk_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(DeleteChunkRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(DataNodeServer).DeleteChunk(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sheetfs.DataNode/DeleteChunk",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(DataNodeServer).DeleteChunk(ctx, req.(*DeleteChunkRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
 // DataNode_ServiceDesc is the grpc.ServiceDesc for DataNode service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -504,6 +536,10 @@ var DataNode_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "WriteChunk",
 			Handler:    _DataNode_WriteChunk_Handler,
+		},
+		{
+			MethodName: "DeleteChunk",
+			Handler:    _DataNode_DeleteChunk_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
