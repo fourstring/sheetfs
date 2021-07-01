@@ -21,6 +21,7 @@ type MasterNodeClient interface {
 	CreateSheet(ctx context.Context, in *CreateSheetRequest, opts ...grpc.CallOption) (*CreateSheetReply, error)
 	DeleteSheet(ctx context.Context, in *DeleteSheetRequest, opts ...grpc.CallOption) (*DeleteSheetReply, error)
 	OpenSheet(ctx context.Context, in *OpenSheetRequest, opts ...grpc.CallOption) (*OpenSheetReply, error)
+	ReadSheet(ctx context.Context, in *ReadSheetRequest, opts ...grpc.CallOption) (*ReadSheetReply, error)
 	RecycleSheet(ctx context.Context, in *RecycleSheetRequest, opts ...grpc.CallOption) (*RecycleSheetReply, error)
 	ResumeSheet(ctx context.Context, in *ResumeSheetRequest, opts ...grpc.CallOption) (*ResumeSheetReply, error)
 	ListSheets(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListSheetsReply, error)
@@ -58,6 +59,15 @@ func (c *masterNodeClient) DeleteSheet(ctx context.Context, in *DeleteSheetReque
 func (c *masterNodeClient) OpenSheet(ctx context.Context, in *OpenSheetRequest, opts ...grpc.CallOption) (*OpenSheetReply, error) {
 	out := new(OpenSheetReply)
 	err := c.cc.Invoke(ctx, "/sheetfs.MasterNode/OpenSheet", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+func (c *masterNodeClient) ReadSheet(ctx context.Context, in *ReadSheetRequest, opts ...grpc.CallOption) (*ReadSheetReply, error) {
+	out := new(ReadSheetReply)
+	err := c.cc.Invoke(ctx, "/sheetfs.MasterNode/ReadSheet", in, out, opts...)
 	if err != nil {
 		return nil, err
 	}
@@ -125,6 +135,7 @@ type MasterNodeServer interface {
 	CreateSheet(context.Context, *CreateSheetRequest) (*CreateSheetReply, error)
 	DeleteSheet(context.Context, *DeleteSheetRequest) (*DeleteSheetReply, error)
 	OpenSheet(context.Context, *OpenSheetRequest) (*OpenSheetReply, error)
+	ReadSheet(context.Context, *ReadSheetRequest) (*ReadSheetReply, error)
 	RecycleSheet(context.Context, *RecycleSheetRequest) (*RecycleSheetReply, error)
 	ResumeSheet(context.Context, *ResumeSheetRequest) (*ResumeSheetReply, error)
 	ListSheets(context.Context, *Empty) (*ListSheetsReply, error)
@@ -146,6 +157,9 @@ func (UnimplementedMasterNodeServer) DeleteSheet(context.Context, *DeleteSheetRe
 }
 func (UnimplementedMasterNodeServer) OpenSheet(context.Context, *OpenSheetRequest) (*OpenSheetReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method OpenSheet not implemented")
+}
+func (UnimplementedMasterNodeServer) ReadSheet(context.Context, *ReadSheetRequest) (*ReadSheetReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method ReadSheet not implemented")
 }
 func (UnimplementedMasterNodeServer) RecycleSheet(context.Context, *RecycleSheetRequest) (*RecycleSheetReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method RecycleSheet not implemented")
@@ -228,6 +242,24 @@ func _MasterNode_OpenSheet_Handler(srv interface{}, ctx context.Context, dec fun
 	}
 	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
 		return srv.(MasterNodeServer).OpenSheet(ctx, req.(*OpenSheetRequest))
+	}
+	return interceptor(ctx, in, info, handler)
+}
+
+func _MasterNode_ReadSheet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(ReadSheetRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterNodeServer).ReadSheet(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sheetfs.MasterNode/ReadSheet",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterNodeServer).ReadSheet(ctx, req.(*ReadSheetRequest))
 	}
 	return interceptor(ctx, in, info, handler)
 }
@@ -358,6 +390,10 @@ var MasterNode_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "OpenSheet",
 			Handler:    _MasterNode_OpenSheet_Handler,
+		},
+		{
+			MethodName: "ReadSheet",
+			Handler:    _MasterNode_ReadSheet_Handler,
 		},
 		{
 			MethodName: "RecycleSheet",
