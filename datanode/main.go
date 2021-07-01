@@ -7,6 +7,7 @@ import (
 	"log"
 	"net"
 	"os"
+	"sheetfs/config"
 	fsrpc "sheetfs/protocol"
 )
 
@@ -116,7 +117,7 @@ func main() {
 	s := grpc.NewServer()
 	fsrpc.RegisterDataNodeServer(s, &server{})
 
-	lis, err := net.Listen("tcp", ":"+PORT)
+	lis, err := net.Listen("tcp", ":"+config.PORT)
 	if err != nil {
 		log.Fatalf("net.Listen err: %v", err)
 	}

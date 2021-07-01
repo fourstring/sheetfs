@@ -3,6 +3,7 @@ package main
 import (
 	"encoding/binary"
 	"os"
+	"sheetfs/config"
 	"strconv"
 )
 
@@ -19,7 +20,7 @@ func bytesToUint64(buf []byte) uint64 {
 }
 
 func getFilename(id uint64) string {
-	return FILE_LOCATION + "chunk_" + strconv.FormatUint(id, 10)
+	return config.FILE_LOCATION + "chunk_" + strconv.FormatUint(id, 10)
 }
 
 func getPaddedData(data []byte, size uint64, padding string) []byte {
@@ -30,7 +31,7 @@ func getPaddedData(data []byte, size uint64, padding string) []byte {
 		paddedData = buffermanager.blankBlock
 		break
 	default:
-		getPaddedBytes(padding, BLOCK_SIZE)
+		getPaddedBytes(padding, config.BLOCK_SIZE)
 	}
 
 	copy(paddedData[:size+1], data)
@@ -45,7 +46,7 @@ func getPaddedFile(data []byte, size uint64, padding string, offset uint64) []by
 		paddedData = buffermanager.blankFile
 		break
 	default:
-		getPaddedBytes(padding, FILE_SIZE)
+		getPaddedBytes(padding, config.FILE_SIZE)
 	}
 
 	copy(paddedData[offset:offset+size+1], data)
@@ -55,13 +56,13 @@ func getPaddedFile(data []byte, size uint64, padding string, offset uint64) []by
 func SyncAndUpdateVersion(file *os.File, version uint64) {
 	//file.Sync()
 	data := uint64ToBytes(version)
-	file.WriteAt(data, VERSION_START_LOCATION)
+	file.WriteAt(data, config.VERSION_START_LOCATION)
 	//file.Sync()
 	file.Close()
 }
 
 func getVersion(file *os.File) uint64 {
 	buf := make([]byte, 8)
-	file.ReadAt(buf, VERSION_START_LOCATION)
+	file.ReadAt(buf, config.VERSION_START_LOCATION)
 	return bytesToUint64(buf)
 }

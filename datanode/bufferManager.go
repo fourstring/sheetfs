@@ -1,5 +1,7 @@
 package main
 
+import "sheetfs/config"
+
 var buffermanager *BufferManager
 
 type BufferManager struct {
@@ -20,8 +22,8 @@ func getPaddedBytes(s string, size int) []byte {
 func init() {
 	if buffermanager == nil {
 		buffermanager = &BufferManager{
-			getPaddedBytes(" ", BLOCK_SIZE),
-			getPaddedBytes(" ", FILE_SIZE),
+			getPaddedBytes(" ", config.BLOCK_SIZE),
+			getPaddedBytes(" ", config.FILE_SIZE),
 		}
 	}
 }

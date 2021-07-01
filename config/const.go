@@ -1,4 +1,4 @@
-package main
+package config
 
 const PORT = "8888"
 const FILE_LOCATION = "../data/"
