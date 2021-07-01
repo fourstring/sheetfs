@@ -21,6 +21,7 @@ service MasterNode {
 service DataNode {
     rpc ReadChunk(ReadChunkRequest) returns (ReadChunkReply) {}
     rpc WriteChunk(WriteChunkRequest) returns (WriteChunkReply) {}
+    rpc DeleteChunk(DeleteChunkRequest) returns (DeleteChunkReply) {}
 }
 
 enum Status {
@@ -149,5 +150,13 @@ message WriteChunkRequest {
 }
 
 message WriteChunkReply {
+    Status status = 1;
+}
+
+message DeleteChunkRequest {
+    uint64 id = 1;
+}
+
+message DeleteChunkReply {
     Status status = 1;
 }
