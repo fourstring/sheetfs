@@ -7,6 +7,7 @@ package sheetfs;
 message Empty {};
 
 service MasterNode {
+    rpc RegisterDataNode(RegisterDataNodeRequest) returns (RegisterDataNodeReply) {}
     rpc CreateSheet(CreateSheetRequest) returns (CreateSheetReply) {}
     rpc DeleteSheet(DeleteSheetRequest) returns (DeleteSheetReply) {}
     rpc OpenSheet(OpenSheetRequest) returns (OpenSheetReply) {}
@@ -16,7 +17,6 @@ service MasterNode {
     rpc ListSheets(Empty) returns (ListSheetsReply) {}
     rpc ReadCell(ReadCellRequest) returns (ReadCellReply) {}
     rpc WriteCell(WriteCellRequest) returns (WriteCellReply) {}
-    rpc CommitCell(CommitCellRequest) returns (CommitCellReply) {}
 }
 
 service DataNode {
@@ -30,6 +30,16 @@ enum Status {
     Exist = 1;
     NotFound = 2;
     WrongVersion = 3;
+    Invalid = 4;
+    Unavailable = 5;
+}
+
+message RegisterDataNodeRequest {
+    string addr = 1;
+}
+
+message RegisterDataNodeReply {
+    Status status = 1;
 }
 
 message CreateSheetRequest {
@@ -125,17 +135,6 @@ message WriteCellRequest {
 message WriteCellReply {
     Status status = 1;
     Cell cell = 2;
-}
-
-message CommitCellRequest {
-    uint64 fd = 1;
-    uint32 row = 2;
-    uint32 column = 3;
-    uint64 version = 4;
-}
-
-message CommitCellReply {
-    Status status = 1;
 }
 
 message ReadChunkRequest {

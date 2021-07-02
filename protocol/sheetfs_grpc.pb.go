@@ -18,6 +18,7 @@ const _ = grpc.SupportPackageIsVersion7
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 type MasterNodeClient interface {
+	RegisterDataNode(ctx context.Context, in *RegisterDataNodeRequest, opts ...grpc.CallOption) (*RegisterDataNodeReply, error)
 	CreateSheet(ctx context.Context, in *CreateSheetRequest, opts ...grpc.CallOption) (*CreateSheetReply, error)
 	DeleteSheet(ctx context.Context, in *DeleteSheetRequest, opts ...grpc.CallOption) (*DeleteSheetReply, error)
 	OpenSheet(ctx context.Context, in *OpenSheetRequest, opts ...grpc.CallOption) (*OpenSheetReply, error)
@@ -27,7 +28,6 @@ type MasterNodeClient interface {
 	ListSheets(ctx context.Context, in *Empty, opts ...grpc.CallOption) (*ListSheetsReply, error)
 	ReadCell(ctx context.Context, in *ReadCellRequest, opts ...grpc.CallOption) (*ReadCellReply, error)
 	WriteCell(ctx context.Context, in *WriteCellRequest, opts ...grpc.CallOption) (*WriteCellReply, error)
-	CommitCell(ctx context.Context, in *CommitCellRequest, opts ...grpc.CallOption) (*CommitCellReply, error)
 }
 
 type masterNodeClient struct {
@@ -36,6 +36,15 @@ type masterNodeClient struct {
 
 func NewMasterNodeClient(cc grpc.ClientConnInterface) MasterNodeClient {
 	return &masterNodeClient{cc}
+}
+
+func (c *masterNodeClient) RegisterDataNode(ctx context.Context, in *RegisterDataNodeRequest, opts ...grpc.CallOption) (*RegisterDataNodeReply, error) {
+	out := new(RegisterDataNodeReply)
+	err := c.cc.Invoke(ctx, "/sheetfs.MasterNode/RegisterDataNode", in, out, opts...)
+	if err != nil {
+		return nil, err
+	}
+	return out, nil
 }
 
 func (c *masterNodeClient) CreateSheet(ctx context.Context, in *CreateSheetRequest, opts ...grpc.CallOption) (*CreateSheetReply, error) {
@@ -119,19 +128,11 @@ func (c *masterNodeClient) WriteCell(ctx context.Context, in *WriteCellRequest, 
 	return out, nil
 }
 
-func (c *masterNodeClient) CommitCell(ctx context.Context, in *CommitCellRequest, opts ...grpc.CallOption) (*CommitCellReply, error) {
-	out := new(CommitCellReply)
-	err := c.cc.Invoke(ctx, "/sheetfs.MasterNode/CommitCell", in, out, opts...)
-	if err != nil {
-		return nil, err
-	}
-	return out, nil
-}
-
 // MasterNodeServer is the server API for MasterNode service.
 // All implementations must embed UnimplementedMasterNodeServer
 // for forward compatibility
 type MasterNodeServer interface {
+	RegisterDataNode(context.Context, *RegisterDataNodeRequest) (*RegisterDataNodeReply, error)
 	CreateSheet(context.Context, *CreateSheetRequest) (*CreateSheetReply, error)
 	DeleteSheet(context.Context, *DeleteSheetRequest) (*DeleteSheetReply, error)
 	OpenSheet(context.Context, *OpenSheetRequest) (*OpenSheetReply, error)
@@ -141,7 +142,6 @@ type MasterNodeServer interface {
 	ListSheets(context.Context, *Empty) (*ListSheetsReply, error)
 	ReadCell(context.Context, *ReadCellRequest) (*ReadCellReply, error)
 	WriteCell(context.Context, *WriteCellRequest) (*WriteCellReply, error)
-	CommitCell(context.Context, *CommitCellRequest) (*CommitCellReply, error)
 	mustEmbedUnimplementedMasterNodeServer()
 }
 
@@ -149,6 +149,9 @@ type MasterNodeServer interface {
 type UnimplementedMasterNodeServer struct {
 }
 
+func (UnimplementedMasterNodeServer) RegisterDataNode(context.Context, *RegisterDataNodeRequest) (*RegisterDataNodeReply, error) {
+	return nil, status.Errorf(codes.Unimplemented, "method RegisterDataNode not implemented")
+}
 func (UnimplementedMasterNodeServer) CreateSheet(context.Context, *CreateSheetRequest) (*CreateSheetReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method CreateSheet not implemented")
 }
@@ -176,9 +179,6 @@ func (UnimplementedMasterNodeServer) ReadCell(context.Context, *ReadCellRequest)
 func (UnimplementedMasterNodeServer) WriteCell(context.Context, *WriteCellRequest) (*WriteCellReply, error) {
 	return nil, status.Errorf(codes.Unimplemented, "method WriteCell not implemented")
 }
-func (UnimplementedMasterNodeServer) CommitCell(context.Context, *CommitCellRequest) (*CommitCellReply, error) {
-	return nil, status.Errorf(codes.Unimplemented, "method CommitCell not implemented")
-}
 func (UnimplementedMasterNodeServer) mustEmbedUnimplementedMasterNodeServer() {}
 
 // UnsafeMasterNodeServer may be embedded to opt out of forward compatibility for this service.
@@ -190,6 +190,24 @@ type UnsafeMasterNodeServer interface {
 
 func RegisterMasterNodeServer(s grpc.ServiceRegistrar, srv MasterNodeServer) {
 	s.RegisterService(&MasterNode_ServiceDesc, srv)
+}
+
+func _MasterNode_RegisterDataNode_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
+	in := new(RegisterDataNodeRequest)
+	if err := dec(in); err != nil {
+		return nil, err
+	}
+	if interceptor == nil {
+		return srv.(MasterNodeServer).RegisterDataNode(ctx, in)
+	}
+	info := &grpc.UnaryServerInfo{
+		Server:     srv,
+		FullMethod: "/sheetfs.MasterNode/RegisterDataNode",
+	}
+	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
+		return srv.(MasterNodeServer).RegisterDataNode(ctx, req.(*RegisterDataNodeRequest))
+	}
+	return interceptor(ctx, in, info, handler)
 }
 
 func _MasterNode_CreateSheet_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
@@ -354,24 +372,6 @@ func _MasterNode_WriteCell_Handler(srv interface{}, ctx context.Context, dec fun
 	return interceptor(ctx, in, info, handler)
 }
 
-func _MasterNode_CommitCell_Handler(srv interface{}, ctx context.Context, dec func(interface{}) error, interceptor grpc.UnaryServerInterceptor) (interface{}, error) {
-	in := new(CommitCellRequest)
-	if err := dec(in); err != nil {
-		return nil, err
-	}
-	if interceptor == nil {
-		return srv.(MasterNodeServer).CommitCell(ctx, in)
-	}
-	info := &grpc.UnaryServerInfo{
-		Server:     srv,
-		FullMethod: "/sheetfs.MasterNode/CommitCell",
-	}
-	handler := func(ctx context.Context, req interface{}) (interface{}, error) {
-		return srv.(MasterNodeServer).CommitCell(ctx, req.(*CommitCellRequest))
-	}
-	return interceptor(ctx, in, info, handler)
-}
-
 // MasterNode_ServiceDesc is the grpc.ServiceDesc for MasterNode service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -379,6 +379,10 @@ var MasterNode_ServiceDesc = grpc.ServiceDesc{
 	ServiceName: "sheetfs.MasterNode",
 	HandlerType: (*MasterNodeServer)(nil),
 	Methods: []grpc.MethodDesc{
+		{
+			MethodName: "RegisterDataNode",
+			Handler:    _MasterNode_RegisterDataNode_Handler,
+		},
 		{
 			MethodName: "CreateSheet",
 			Handler:    _MasterNode_CreateSheet_Handler,
@@ -414,10 +418,6 @@ var MasterNode_ServiceDesc = grpc.ServiceDesc{
 		{
 			MethodName: "WriteCell",
 			Handler:    _MasterNode_WriteCell_Handler,
-		},
-		{
-			MethodName: "CommitCell",
-			Handler:    _MasterNode_CommitCell_Handler,
 		},
 	},
 	Streams:  []grpc.StreamDesc{},
