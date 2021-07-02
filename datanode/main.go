@@ -39,7 +39,7 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 
 	// check version
 	curVersion := getVersion(file)
-	if curVersion+1 == request.Version {
+	if curVersion < request.Version {
 		// the version is correct
 		data := make([]byte, request.Size)
 		_, err = file.ReadAt(data, int64(request.Offset))
@@ -52,7 +52,7 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 		}
 		// read the correct data
 		reply.Data = data
-		reply.Status = fsrpc.Status_Exist
+		reply.Status = fsrpc.Status_OK
 	} else {
 		file.Close()
 		reply.Status = fsrpc.Status_WrongVersion
@@ -122,5 +122,8 @@ func main() {
 		log.Fatalf("net.Listen err: %v", err)
 	}
 
-	s.Serve(lis)
+	err = s.Serve(lis)
+	if err != nil {
+		log.Fatalf("s.Serve err: %v", err)
+	}
 }
