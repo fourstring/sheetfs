@@ -2,25 +2,41 @@ package client
 
 import (
 	"context"
+	"flag"
+	"google.golang.org/grpc"
 	"io/fs"
+	"log"
 	"sheetfs/config"
 	fsrpc "sheetfs/protocol"
 	"strings"
 	"sync"
 )
 
+var address = flag.String("a", "", "address to which the master listens")
 var s *Server
 
 type Server struct {
-	masterServer   fsrpc.MasterNodeServer
-	datanodeServer fsrpc.DataNodeServer
+	masterServer   fsrpc.MasterNodeClient
+	datanodeServer fsrpc.DataNodeClient
 	ctx            context.Context
 }
 
 func init() {
+	// Set up a connection to the server.
+	conn, err := grpc.Dial(*address, grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		log.Fatalf("did not connect: %v", err)
+	}
+	defer conn.Close()
+
+	master := fsrpc.NewMasterNodeClient(conn)
+	datanode := fsrpc.NewDataNodeClient(conn)
+
 	if s == nil {
 		s = &Server{
-			ctx: context.Background(),
+			masterServer:   master,
+			datanodeServer: datanode,
+			ctx:            context.Background(),
 		}
 	}
 }
@@ -166,7 +182,7 @@ func (f *File) Read(b []byte) (n int64, err error) {
 				print("data chunk mismatch master chunk")
 				return
 			}
-			if dataReq.Id == config.SPECIAL_ID {
+			if chunk.HoldsMeta {
 				copy(metaData, dataReply.Data)
 			} else {
 				data = append(data, dataReply.Data...)
