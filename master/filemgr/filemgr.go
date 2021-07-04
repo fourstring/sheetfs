@@ -94,7 +94,7 @@ access to this file. If this file is not loaded into memory, do it on-demand.
 */
 func (f *FileManager) openFile(filename string) (uint64, error) {
 	f.mu.Lock()
-	defer f.mu.Lock()
+	defer f.mu.Unlock()
 	// Lookup in directory entries to check validity of filename.
 	entry, ok := f.entries[filename]
 	// If there is no such an entry, or the entry has been marked as recycled,
@@ -317,7 +317,7 @@ func (f *FileManager) GetAllSheets() []*fs_rpc.Sheet {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 
-	pbSheets := make([]*fs_rpc.Sheet, 0, len(f.entries))
+	pbSheets := make([]*fs_rpc.Sheet, len(f.entries))
 	i := 0
 	for _, entry := range f.entries {
 		pbSheets[i] = &fs_rpc.Sheet{

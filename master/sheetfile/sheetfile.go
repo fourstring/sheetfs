@@ -35,7 +35,7 @@ type SheetFile struct {
 	Chunks map[uint64]*Chunk
 	// All Cells in the sheet.
 	// Maps CellID to *Cell.
-	Cells map[uint64]*Cell
+	Cells map[int64]*Cell
 	// Keeps track of latest Chunk whose remaining space is capable of storing a new Cell.
 	LastAvailableChunk *Chunk
 
@@ -44,7 +44,8 @@ type SheetFile struct {
 
 /*
 CreateSheetFile
-Create a SheetFile, and corresponding sqlite table to store Cells of the SheetFile.
+Create a SheetFile, corresponding sqlite table to store Cells of the SheetFile, MetaCell
+and chunk used to store it.
 Theoretically, it's not required to flush the metadata of a new file to disk immediately.
 However, we make use of sqlite as some kind of alternative to general BTree. So we create
 the table here as a workaround.
@@ -55,12 +56,15 @@ the table here as a workaround.
 
 @return
 	*SheetFile: pointer of new SheetFile if success, or nil.
-	error: not nil if some error happens while creating cell table.
+	error:
+		some error happens while creating cell table.
+		*errors.NoDataNodeError: This function must allocate a Chunk for MetaCell, if there
+		are no DataNodes for storing this cell, returns NoDateNodeError.
 */
 func CreateSheetFile(db *gorm.DB, filename string) (*SheetFile, error) {
 	f := &SheetFile{
 		Chunks:             map[uint64]*Chunk{},
-		Cells:              map[uint64]*Cell{},
+		Cells:              map[int64]*Cell{},
 		LastAvailableChunk: nil,
 		filename:           filename,
 	}
@@ -68,6 +72,20 @@ func CreateSheetFile(db *gorm.DB, filename string) (*SheetFile, error) {
 	if err != nil {
 		return nil, err
 	}
+	dataNode, err := datanode_alloc.AllocateNode()
+	if err != nil {
+		return nil, err
+	}
+	// Create Chunk and MetaCell
+	// When Chunk is empty, its Version is 0. We add a Cell to this Chunk immediately,
+	// So let its Version equals to 1 here.
+	chunk := &Chunk{DataNode: dataNode, Version: 1}
+	chunk.Persistent(db)
+	metaCell := NewCell(config.SheetMetaCellID, 0, config.BytesPerChunk, chunk.ID, filename)
+	chunk.Cells = []*Cell{metaCell}
+	// Add MetaCell and Chunk to new file
+	f.Chunks[chunk.ID] = chunk
+	f.Cells[metaCell.CellID] = metaCell
 	return f, nil
 }
 
@@ -93,10 +111,13 @@ func LoadSheetFile(db *gorm.DB, filename string) *SheetFile {
 	cells := GetSheetCellsAll(db, filename)
 	file := &SheetFile{
 		Chunks:   map[uint64]*Chunk{},
-		Cells:    map[uint64]*Cell{},
+		Cells:    map[int64]*Cell{},
 		filename: filename,
 	}
 	for _, cell := range cells {
+		// sheetName is ignored by gorm, not persist to sqlite
+		// However it's necessary to persist cell later
+		cell.sheetName = filename
 		file.Cells[cell.CellID] = cell
 		_, ok := file.Chunks[cell.ChunkID]
 		// config.MaxCellsPerChunk cells will be stored in the same Chunk at most.
@@ -104,13 +125,12 @@ func LoadSheetFile(db *gorm.DB, filename string) *SheetFile {
 		// To avoid expensive database operations, we first check whether cell.ChunkID
 		// has been loaded or not.
 		if !ok {
-			var dataChunk *Chunk
-			db.First(dataChunk, cell.ChunkID)
+			dataChunk := loadChunkForFile(db, filename, cell.ChunkID)
 			file.Chunks[cell.ChunkID] = dataChunk
 			// SheetFile.WriteCellChunk guarantees that it always fulfill currently
 			// available Chunk before allocating a new one. So the first Chunk whose
 			// IsAvailable() should be the LastAvailableChunk.
-			if file.LastAvailableChunk == nil && dataChunk.IsAvailable() {
+			if file.LastAvailableChunk == nil && dataChunk.IsAvailable(config.MaxBytesPerCell) {
 				file.LastAvailableChunk = dataChunk
 			}
 		}
@@ -128,9 +148,11 @@ Returns the Snapshot of all Chunks.
 func (s *SheetFile) GetAllChunks() []*Chunk {
 	s.mu.RLock()
 	defer s.mu.RUnlock()
-	chunks := make([]*Chunk, 0, len(s.Chunks))
-	for i, c := range s.Chunks {
+	chunks := make([]*Chunk, len(s.Chunks))
+	i := 0
+	for _, c := range s.Chunks {
 		chunks[i] = c.Snapshot()
+		i++
 	}
 	return chunks
 }
@@ -168,37 +190,27 @@ So the offset is the 0-indexed index of the new Cell in the Chunk times
 config.MaxBytesPerCell.
 */
 func (s *SheetFile) getCellOffset(chunk *Chunk) uint64 {
-	return (uint64(len(chunk.Cells)) - 1) * config.MaxBytesPerCell
+	return (uint64(len(chunk.Cells))) * config.MaxBytesPerCell
 }
 
 /*
 addCellToLastAvailable
-Add a new cell located at (row,col) to s.LastAvailableChunk.
-Generally, the size of the new Cell is config.MaxBytesPerCell. However, for
-the MetaCell defined by (config.SheetMetaCellRow,config.SheetMetaCellCol),
-a whole chunk will be granted to store metadata of a sheet.
+Add a new cell with given maximum size located at (row,col) to s.LastAvailableChunk.
 
 @para
 	row: row number
 	col: column number
+	size: maximum size of new Cell
 
 @return
 	*Cell: pointer of new Cell
 */
-func (s *SheetFile) addCellToLastAvailable(row, col uint32) *Cell {
-	size := config.MaxBytesPerCell
-	// check for MetaCell
-	if row == config.SheetMetaCellRow && col == config.SheetMetaCellCol {
-		size = config.BytesPerChunk
-	}
-	cell := &Cell{
-		CellID:    GetCellID(row, col),
-		Offset:    s.getCellOffset(s.LastAvailableChunk),
-		Size:      uint64(size),
-		ChunkID:   s.LastAvailableChunk.ID,
-		sheetName: s.filename,
-	}
+func (s *SheetFile) addCellToLastAvailable(row, col uint32, size uint64) *Cell {
+	cell := NewCell(GetCellID(row, col), s.getCellOffset(s.LastAvailableChunk),
+		size, s.LastAvailableChunk.ID, s.filename)
 	s.Cells[cell.CellID] = cell
+	// Add new cell to cells of chunk
+	s.LastAvailableChunk.Cells = append(s.LastAvailableChunk.Cells, cell)
 	// Increase Version of LastAvailableChunk because new Cell is added.
 	s.LastAvailableChunk.Version += 1
 	return cell
@@ -219,7 +231,7 @@ Performs necessary metadata mutations to handle an operation of writing data to 
 */
 func (s *SheetFile) WriteCellChunk(row, col uint32, tx *gorm.DB) (*Cell, *Chunk, error) {
 	s.mu.Lock()
-	defer s.mu.Lock()
+	defer s.mu.Unlock()
 	cell := s.Cells[GetCellID(row, col)]
 	// Lookup an existing Cell by CellID first
 	if cell != nil {
@@ -228,10 +240,17 @@ func (s *SheetFile) WriteCellChunk(row, col uint32, tx *gorm.DB) (*Cell, *Chunk,
 		dataChunk.Version += 1
 		return cell.Snapshot(), dataChunk.Snapshot(), nil
 	} else {
+		// Generally, the size of the new Cell is config.MaxBytesPerCell. However, for
+		// the MetaCell defined by (config.SheetMetaCellRow,config.SheetMetaCellCol),
+		// a whole chunk should be granted to store metadata of a sheet.
+		newCellSize := config.MaxBytesPerCell
+		if row == config.SheetMetaCellRow && col == config.SheetMetaCellCol {
+			newCellSize = config.BytesPerChunk
+		}
 		// For a new Cell, tries to add it to s.LastAvailableChunk
-		if s.LastAvailableChunk != nil && s.LastAvailableChunk.IsAvailable() {
+		if s.LastAvailableChunk != nil && s.LastAvailableChunk.IsAvailable(newCellSize) {
 			// There is a empty slot for the new Cell, add it to s.LastAvailableChunk
-			cell = s.addCellToLastAvailable(row, col)
+			cell = s.addCellToLastAvailable(row, col, newCellSize)
 			return cell.Snapshot(), s.LastAvailableChunk.Snapshot(), nil
 		} else {
 			// s.LastAvailableChunk has been fulfilled, allocate a new Chunk, and
@@ -254,7 +273,7 @@ func (s *SheetFile) WriteCellChunk(row, col uint32, tx *gorm.DB) (*Cell, *Chunk,
 			// Let newChunk to be s.LastAvailableChunk
 			s.LastAvailableChunk = newChunk
 			// Re-use logic of addCellToLastAvailable
-			cell = s.addCellToLastAvailable(row, col)
+			cell = s.addCellToLastAvailable(row, col, newCellSize)
 			return cell.Snapshot(), newChunk.Snapshot(), nil
 		}
 	}

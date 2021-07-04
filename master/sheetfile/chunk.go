@@ -2,6 +2,7 @@ package sheetfile
 
 import (
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"sheetfs/master/config"
 	"sheetfs/master/model"
 )
@@ -34,21 +35,26 @@ type Chunk struct {
 
 /*
 IsAvailable
-Returns true if c is available to store more Cell, or false on the contrary.
-A Chunk contains config.MaxCellsPerChunk slots, each for one Cell.
+Returns true if c is available to store a new Cell with given size.
 */
-func (c *Chunk) IsAvailable() bool {
-	return len(c.Cells) < config.MaxCellsPerChunk
+func (c *Chunk) IsAvailable(size uint64) bool {
+	used := uint64(0)
+	for _, cell := range c.Cells {
+		used += cell.Size
+	}
+	remains := config.BytesPerChunk - used
+	return size <= remains
 }
 
 /*
 Persistent
-Flush Chunk data in memory into sqlite.
+Flush Chunk data in memory into sqlite. But Chunk.Cells is not taken into consideration
+because dynamic table names are applied. They should be persisted manually.
 This method should be used only for checkpointing, and is supposed to be called
 in a transaction for atomicity.
 */
 func (c *Chunk) Persistent(tx *gorm.DB) {
-	tx.Save(c)
+	tx.Omit(clause.Associations).Save(c)
 }
 
 /*
@@ -65,4 +71,26 @@ func (c *Chunk) Snapshot() *Chunk {
 	nc = *c
 	nc.Cells = nil
 	return &nc
+}
+
+/*
+loadChunkForFile
+Load a chunk for a sheet with given id from sqlite. And preload all Cells simultaneously.
+This function do not check id passed in, so it's not exported. Caller should
+check against id.
+
+@para
+	tx: a gorm connection, it can be a transaction.
+	filename
+	id: Chunk.ID
+
+@return
+	*Chunk
+*/
+func loadChunkForFile(tx *gorm.DB, filename string, id uint64) *Chunk {
+	var c Chunk
+	tx.Preload("Cells", func(db *gorm.DB) *gorm.DB {
+		return db.Table(GetCellTableName(filename))
+	}).First(&c, id)
+	return &c
 }
