@@ -67,6 +67,7 @@ message Chunk {
     uint64 id = 1;
     string datanode = 2;
     uint64 version = 3;
+    bool holds_meta = 4;
 }
 
 message OpenSheetReply {
