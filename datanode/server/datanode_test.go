@@ -6,6 +6,7 @@ import (
 	"io/ioutil"
 	"os"
 	"path"
+	"sheetfs/config"
 	fsrpc "sheetfs/protocol"
 	"testing"
 )
@@ -13,9 +14,9 @@ import (
 func TestDatanode(t *testing.T) {
 	s := server{}
 
-	dir, _ := ioutil.ReadDir("../data")
+	dir, _ := ioutil.ReadDir(config.FILE_LOCATION)
 	for _, d := range dir {
-		os.RemoveAll(path.Join([]string{"../data", d.Name()}...))
+		os.RemoveAll(path.Join([]string{config.FILE_LOCATION, d.Name()}...))
 	}
 
 	// first create

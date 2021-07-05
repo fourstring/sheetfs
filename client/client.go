@@ -43,8 +43,9 @@ func Init(masterAddr string) {
 		}
 		master := fsrpc.NewMasterNodeClient(conn)
 		g = &Global{
-			masterClient: master,
-			ctx:          context.Background(),
+			masterClient:      master,
+			datanodeClientMap: make(map[string]fsrpc.DataNodeClient),
+			ctx:               context.Background(),
 		}
 	}
 }
@@ -169,8 +170,8 @@ func (f *File) Read(b []byte) (n int64, err error) {
 
 	// read every chunk of the file
 	var wg sync.WaitGroup
-	var data []byte
-	var metaData []byte
+	data := make([]byte, 0)
+	metaData := make([]byte, 0)
 
 	for _, chunk := range masterReply.Chunks {
 		wg.Add(1)
@@ -179,16 +180,16 @@ func (f *File) Read(b []byte) (n int64, err error) {
 		chunk := chunk
 		go func() {
 			// get the whole chunk data
-			dataReq := fsrpc.ReadChunkRequest{
+			dataReply, err := ConcurrentReadChunk(g.ctx, &fsrpc.ReadChunkRequest{
 				Id:      chunk.Id,
 				Offset:  0,
 				Size:    config.FILE_SIZE,
 				Version: chunk.Version,
-			}
-			dataReply, err := ConcurrentReadChunk(g.ctx, &dataReq)
+			})
 
 			if err != nil || dataReply.Status != fsrpc.Status_OK {
 				print("data chunk mismatch master chunk")
+				defer wg.Done()
 				return
 			}
 			if chunk.HoldsMeta {
@@ -205,7 +206,14 @@ func (f *File) Read(b []byte) (n int64, err error) {
 	wg.Wait()
 
 	// convert to JSON
+	// DynamicCopy(&b, connect(data, metaData))
+	//src := connect(data, metaData)
+	//for i := 0; i < len(b); i++ {
+	//	b[i] = src[i]
+	//}
+	//b = append(b, src[len(b):]...)
 	copy(b, connect(data, metaData))
+
 	return int64(len(b)), nil
 }
 
@@ -250,7 +258,9 @@ func (f *File) ReadAt(b []byte, col uint32, row uint32) (n int64, err error) {
 	switch dataReply.Status {
 	case fsrpc.Status_OK:
 		// open correctly
+		// DynamicCopy(&b, dataReply.Data)
 		copy(b, dataReply.Data)
+		// b = append(b, dataReply.Data[len(b):]...)
 		return int64(masterReply.Cell.Size), nil
 	case fsrpc.Status_NotFound:
 		// not found
@@ -294,7 +304,7 @@ func (f *File) WriteAt(b []byte, col uint32, row uint32, padding string) (n int6
 		version = 0
 	default:
 		// should never reach here
-		panic("OpenSheet RPC return illegal Status")
+		panic("WriteCell RPC return illegal Status")
 	}
 
 	// if padding is empty

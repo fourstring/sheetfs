@@ -40,7 +40,7 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 
 	// check version
 	curVersion := utils.GetVersion(file)
-	if curVersion < request.Version {
+	if curVersion <= request.Version {
 		// the version is correct
 		data := make([]byte, request.Size)
 		_, err = file.ReadAt(data, int64(request.Offset))
@@ -90,6 +90,7 @@ func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 	}
 
 	curVersion := utils.GetVersion(file)
+	print("current version: ", curVersion, ", request version: ", request.Version)
 	if curVersion+1 == request.Version {
 		// can update
 		// write the data

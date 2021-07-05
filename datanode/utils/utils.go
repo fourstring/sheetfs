@@ -34,7 +34,7 @@ func GetPaddedData(data []byte, size uint64, padding string) []byte {
 	//default:
 	//	getPaddedBytes(padding, config.BLOCK_SIZE)
 	//}
-	buffmgr.GetPaddedBytes(padding, config.BLOCK_SIZE)
+	paddedData = buffmgr.GetPaddedBytes(padding, config.BLOCK_SIZE)
 
 	copy(paddedData[:size+1], data)
 	return paddedData
@@ -50,7 +50,7 @@ func GetPaddedFile(data []byte, size uint64, padding string, offset uint64) []by
 	//default:
 	//	getPaddedBytes(padding, config.FILE_SIZE)
 	//}
-	buffmgr.GetPaddedBytes(padding, config.FILE_SIZE)
+	paddedData = buffmgr.GetPaddedBytes(padding, config.FILE_SIZE)
 
 	copy(paddedData[offset:offset+size+1], data)
 	return paddedData
