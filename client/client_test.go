@@ -19,13 +19,6 @@ import (
 )
 
 var FileLockMap sync.Map
-
-func TestUtils(t *testing.T) {
-	data := connect([]byte("{\n            \"c\": 1,\n            \"r\": 2,\n            \"v\": {\n                \"ct\": {\n                    \"fa\": \"General\",\n                    \"t\": \"g\"\n                },\n                \"m\": \"ww\",\n                \"v\": \"ww\"\n            }\n        },"),
-		[]byte("\"index\": \"sheet_1\",\n    \"color\": \"\",\n    \"name\": \"1\",\n    \"order\": 0,\n    \"status\": 1"))
-	print(data)
-}
-
 var maxRetry = 10
 var masterSrv, datanodeSrv *grpc.Server
 
@@ -181,5 +174,107 @@ func TestCreate(t *testing.T) {
 			So(err, ShouldEqual, nil)
 			So(file.Fd, ShouldEqual, 0)
 		})
+	})
+}
+
+func TestOpen(t *testing.T) {
+	Convey("Start test servers", t, func() {
+		// Booting up testing nodes
+		masterAddr, datanodeAddr, err := startNodes()
+		// call stopNodes unconditionally (although err!=nil)
+		defer stopNodes()
+		So(err, ShouldBeNil)
+		// register DataNode created to MasterNode
+		status := registerDataNode(masterAddr, datanodeAddr)
+		So(status, ShouldEqual, fs_rpc.Status_OK)
+		// Init client library
+		Init(masterAddr)
+		Convey("Open exist test file", func() {
+			Create("test file")
+			file, err := Open("test file")
+			So(err, ShouldEqual, nil)
+			So(file.Fd, ShouldEqual, 1) // create fd 0
+		})
+
+		Convey("Open non-exist test file", func() {
+			file, err := Open("non-exist file")
+			So(err, ShouldNotBeNil)
+			So(file, ShouldEqual, nil)
+		})
+	})
+}
+
+func TestDelete(t *testing.T) {
+	Convey("Start test servers", t, func() {
+		// Booting up testing nodes
+		masterAddr, datanodeAddr, err := startNodes()
+		// call stopNodes unconditionally (although err!=nil)
+		defer stopNodes()
+		So(err, ShouldBeNil)
+		// register DataNode created to MasterNode
+		status := registerDataNode(masterAddr, datanodeAddr)
+		So(status, ShouldEqual, fs_rpc.Status_OK)
+		// Init client library
+		Init(masterAddr)
+		Convey("Delete test file", func() {
+			// TODO
+		})
+
+		Convey("Delete non-exist test file", func() {
+			// TODO
+		})
+	})
+}
+
+func TestReadAndWrite(t *testing.T) {
+	Convey("Start test servers", t, func() {
+		// Booting up testing nodes
+		masterAddr, datanodeAddr, err := startNodes()
+		// call stopNodes unconditionally (although err!=nil)
+		defer stopNodes()
+		So(err, ShouldBeNil)
+		// register DataNode created to MasterNode
+		status := registerDataNode(masterAddr, datanodeAddr)
+		So(status, ShouldEqual, fs_rpc.Status_OK)
+		// Init client library
+		Init(masterAddr)
+
+		// var file File
+		Convey("Read empty file after create", func() {
+			file, err := Create("test file")
+
+			read := make([]byte, 1024)
+			_, err = file.Read(read) // must call this before write
+
+			header := []byte("{\"celldata\": []}")
+			So(read[:len(header)], ShouldResemble, header)
+			So(err, ShouldBeNil)
+
+			// read := make([]byte, 1024)
+			b := []byte("this is test")
+
+			size, err := file.WriteAt(b, 0, 0, " ")
+			So(size, ShouldEqual, len(b))
+			So(err, ShouldBeNil)
+
+			size, err = file.ReadAt(read, 0, 0)
+			So(read[:len(b)], ShouldResemble, b)
+			So(size, ShouldEqual, 2048)
+			So(err, ShouldBeNil)
+		})
+
+		//Convey("ReadAt the same after WriteAt", func() {
+		//	read := make([]byte, 1024)
+		//	b := []byte("this is test")
+		//
+		//	size, err := file.WriteAt(b, 0, 0, " ")
+		//	So(size, ShouldEqual, len(b))
+		//	So(err, ShouldBeNil)
+		//
+		//	size, err = file.ReadAt(read, 0, 0)
+		//	So(read[:len(b)], ShouldEqual, b)
+		//	So(size, ShouldResemble, 2048)
+		//	So(err, ShouldBeNil)
+		//})
 	})
 }
