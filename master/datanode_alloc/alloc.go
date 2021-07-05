@@ -10,7 +10,7 @@ type dataNode struct {
 }
 
 type DataNodeAllocator struct {
-	mu           sync.RWMutex
+	mu           sync.Mutex
 	dataNodes    []*dataNode
 	dataNodesSet map[string]struct{}
 	curPos       uint
@@ -34,13 +34,14 @@ func (c *DataNodeAllocator) addDataNode(address string) {
 		return
 	}
 	c.dataNodes = append(c.dataNodes, &dataNode{address: address})
+	// Simple strategy: use newly added node first for better load balancing
 	c.curPos = uint(len(c.dataNodes)) - 1
 	c.dataNodesSet[address] = struct{}{}
 }
 
 func (c *DataNodeAllocator) allocateNode() string {
-	c.mu.RLock()
-	defer c.mu.RUnlock()
+	c.mu.Lock()
+	defer c.mu.Unlock()
 	if len(c.dataNodes) == 0 {
 		return ""
 	}

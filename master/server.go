@@ -19,8 +19,9 @@ type server struct {
 
 /*
 NewServer
-AutoMigrate sqlite table structure for MapEntry, Cell and Chunk. Then initialize a zap Logger
-and load FileManager from database to create a server.
+AutoMigrate sqlite table structure for MapEntry and Chunk (Tables for Cell will
+be created during file creation). Then initialize a zap Logger and load FileManager
+from database to create a server.
 
 @para
 	db: a gorm connection. It can't be a transaction.
@@ -31,7 +32,7 @@ and load FileManager from database to create a server.
 		errors during auto migration.
 */
 func NewServer(db *gorm.DB) (*server, error) {
-	err := db.AutoMigrate(&filemgr.MapEntry{}, &sheetfile.Cell{}, &sheetfile.Chunk{})
+	err := db.AutoMigrate(&filemgr.MapEntry{}, &sheetfile.Chunk{})
 	if err != nil {
 		return nil, err
 	}
@@ -57,6 +58,7 @@ func (s *server) defaultErrorHandler(err error, status *fs_rpc.Status) {
 	case *errors.CellNotFoundError:
 		*status = fs_rpc.Status_Invalid
 	case *errors.FileNotFoundError:
+		*status = fs_rpc.Status_NotFound
 	case *errors.FdNotFoundError:
 		*status = fs_rpc.Status_NotFound
 	case *errors.NoDataNodeError:
@@ -83,12 +85,13 @@ func (s *server) ReadSheet(ctx context.Context, request *fs_rpc.ReadSheetRequest
 		}, nil
 	}
 
-	pbChunks := make([]*fs_rpc.Chunk, 0, len(chunks))
+	pbChunks := make([]*fs_rpc.Chunk, len(chunks))
 	for i, c := range chunks {
 		pbChunks[i] = &fs_rpc.Chunk{
-			Id:       c.ID,
-			Datanode: c.DataNode,
-			Version:  c.Version,
+			Id:        c.ID,
+			Datanode:  c.DataNode,
+			Version:   c.Version,
+			HoldsMeta: len(c.Cells) == 1 && c.Cells[0].IsMeta(),
 		}
 	}
 	reply := &fs_rpc.ReadSheetReply{
@@ -172,9 +175,10 @@ func (s *server) ReadCell(ctx context.Context, request *fs_rpc.ReadCellRequest) 
 		Status: status,
 		Cell: &fs_rpc.Cell{
 			Chunk: &fs_rpc.Chunk{
-				Id:       dataChunk.ID,
-				Datanode: dataChunk.DataNode,
-				Version:  dataChunk.Version,
+				Id:        dataChunk.ID,
+				Datanode:  dataChunk.DataNode,
+				Version:   dataChunk.Version,
+				HoldsMeta: len(dataChunk.Cells) == 1 && dataChunk.Cells[0].IsMeta(),
 			},
 			Offset: cell.Offset,
 			Size:   cell.Size,

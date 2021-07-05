@@ -147,7 +147,8 @@ message ReadChunkRequest {
 
 message ReadChunkReply {
     Status status = 1;
-    bytes data = 2;
+    uint64 version = 2;
+    bytes data = 3;
 }
 
 message WriteChunkRequest {

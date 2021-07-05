@@ -3,6 +3,7 @@ package sheetfile
 import (
 	"fmt"
 	"gorm.io/gorm"
+	"sheetfs/master/config"
 	"strings"
 	"text/template"
 )
@@ -30,12 +31,17 @@ type Cell struct {
 	// CellID is used to accelerate looking up cell by row and column number
 	// CellID is composed of row and column number, which makes CellID a standalone sqlite index,
 	// rather than maintaining a joined index on (row,col)
-	CellID  uint64 `gorm:"index"`
+	// uint64 is not supported in sqlite, use int64 as a workaround
+	CellID  int64 `gorm:"index"`
 	Offset  uint64
 	Size    uint64
 	ChunkID uint64
 
 	sheetName string `gorm:"-"`
+}
+
+func NewCell(cellID int64, offset uint64, size uint64, chunkID uint64, sheetName string) *Cell {
+	return &Cell{CellID: cellID, Offset: offset, Size: size, ChunkID: chunkID, sheetName: sheetName}
 }
 
 /*
@@ -82,8 +88,8 @@ uint64, and put column number in lower 32bits.
 @return
 	uint64 CellID of Cell located at (row, col)
 */
-func GetCellID(row uint32, col uint32) uint64 {
-	return uint64(row)<<32 | uint64(col)
+func GetCellID(row uint32, col uint32) int64 {
+	return int64(row)<<32 | int64(col)
 }
 
 /*
@@ -175,4 +181,12 @@ in a transaction for atomicity.
 */
 func (c *Cell) Persistent(tx *gorm.DB) {
 	tx.Table(c.TableName()).Save(c)
+}
+
+/*
+IsMeta
+Returns true if c is the MetaCell. (See SheetFile)
+*/
+func (c *Cell) IsMeta() bool {
+	return c.CellID == config.SheetMetaCellID
 }
