@@ -103,9 +103,9 @@ func TestSheetFile_addCellToLastAvailable(t *testing.T) {
 			sheet.addCellToLastAvailable(0, 0, config.MaxBytesPerCell)
 			sheet.addCellToLastAvailable(1, 1, config.MaxBytesPerCell)
 			sheet.addCellToLastAvailable(2, 2, config.MaxBytesPerCell)
-			So(sheet.LastAvailableChunk.IsAvailable(config.MaxBytesPerCell), ShouldEqual, true)
+			So(sheet.LastAvailableChunk.isAvailable(config.MaxBytesPerCell), ShouldEqual, true)
 			sheet.addCellToLastAvailable(3, 3, config.MaxBytesPerCell)
-			So(sheet.LastAvailableChunk.IsAvailable(config.MaxBytesPerCell), ShouldEqual, false)
+			So(sheet.LastAvailableChunk.isAvailable(config.MaxBytesPerCell), ShouldEqual, false)
 			So(sheet.LastAvailableChunk.Version, ShouldEqual, 4)
 		})
 	})
@@ -144,7 +144,7 @@ func TestCreateSheetFile(t *testing.T) {
 				So(metaCell.Offset, ShouldEqual, 0)
 				// check metaChunk
 				So(metaChunk.Version, ShouldEqual, 1)
-				So(metaChunk.IsAvailable(config.MaxBytesPerCell), ShouldEqual, false)
+				So(metaChunk.isAvailable(config.MaxBytesPerCell), ShouldEqual, false)
 				// check relationship between metaCell and metaChunk
 				So(metaCell.ChunkID, ShouldEqual, metaChunk.ID)
 				So(len(metaChunk.Cells), ShouldEqual, 1)
@@ -261,14 +261,14 @@ func TestLoadSheetFile(t *testing.T) {
 			case 1:
 				So(len(chunk.Cells), ShouldEqual, 1)
 				So(chunk.Cells[0].IsMeta(), ShouldEqual, true)
-				So(chunk.IsAvailable(config.MaxBytesPerCell), ShouldEqual, false)
+				So(chunk.isAvailable(config.MaxBytesPerCell), ShouldEqual, false)
 				continue
 			case 4:
 				So(len(chunk.Cells), ShouldEqual, 2)
-				So(chunk.IsAvailable(config.MaxBytesPerCell), ShouldEqual, true)
+				So(chunk.isAvailable(config.MaxBytesPerCell), ShouldEqual, true)
 			default:
 				So(len(chunk.Cells), ShouldEqual, 4)
-				So(chunk.IsAvailable(config.MaxBytesPerCell), ShouldEqual, false)
+				So(chunk.isAvailable(config.MaxBytesPerCell), ShouldEqual, false)
 			}
 			for _, cell := range chunk.Cells {
 				So(cell.ChunkID, ShouldEqual, chunk.ID)

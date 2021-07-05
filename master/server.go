@@ -58,6 +58,7 @@ func (s *server) defaultErrorHandler(err error, status *fs_rpc.Status) {
 	case *errors.CellNotFoundError:
 		*status = fs_rpc.Status_Invalid
 	case *errors.FileNotFoundError:
+		*status = fs_rpc.Status_NotFound
 	case *errors.FdNotFoundError:
 		*status = fs_rpc.Status_NotFound
 	case *errors.NoDataNodeError:
@@ -174,9 +175,10 @@ func (s *server) ReadCell(ctx context.Context, request *fs_rpc.ReadCellRequest) 
 		Status: status,
 		Cell: &fs_rpc.Cell{
 			Chunk: &fs_rpc.Chunk{
-				Id:       dataChunk.ID,
-				Datanode: dataChunk.DataNode,
-				Version:  dataChunk.Version,
+				Id:        dataChunk.ID,
+				Datanode:  dataChunk.DataNode,
+				Version:   dataChunk.Version,
+				HoldsMeta: len(dataChunk.Cells) == 1 && dataChunk.Cells[0].IsMeta(),
 			},
 			Offset: cell.Offset,
 			Size:   cell.Size,

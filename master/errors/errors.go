@@ -42,7 +42,7 @@ func NewFdNotFoundError(fd uint64) *FdNotFoundError {
 }
 
 func (f *FdNotFoundError) Error() string {
-	return fmt.Sprintf("Fd %u not found!", f.fd)
+	return fmt.Sprintf("Fd %d not found!", f.fd)
 }
 
 type CellNotFoundError struct {
@@ -50,7 +50,7 @@ type CellNotFoundError struct {
 }
 
 func (c *CellNotFoundError) Error() string {
-	return fmt.Sprintf("Cell %u,%u not found!", c.row, c.col)
+	return fmt.Sprintf("Cell %d,%d not found!", c.row, c.col)
 }
 
 func NewCellNotFoundError(row uint32, col uint32) *CellNotFoundError {

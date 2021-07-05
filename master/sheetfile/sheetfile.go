@@ -95,7 +95,7 @@ Load a SheetFile from database. As mentioned above, SheetFile has not to be pers
 In fact, this function loads all Cells of given filename from database. Afterwards,
 this function scans over those cells, adding them to SheetFile.Cells, and their Chunk to
 SheetFile.Chunks. Besides, this function also set SheetFile.LastAvailableChunk to the
-first Chunk whose IsAvailable() is true.
+first Chunk whose isAvailable() is true.
 
 This method should only be used to load checkpoints in sqlite. (See GetSheetCellsAll)
 
@@ -129,8 +129,8 @@ func LoadSheetFile(db *gorm.DB, filename string) *SheetFile {
 			file.Chunks[cell.ChunkID] = dataChunk
 			// SheetFile.WriteCellChunk guarantees that it always fulfill currently
 			// available Chunk before allocating a new one. So the first Chunk whose
-			// IsAvailable() should be the LastAvailableChunk.
-			if file.LastAvailableChunk == nil && dataChunk.IsAvailable(config.MaxBytesPerCell) {
+			// isAvailable() should be the LastAvailableChunk.
+			if file.LastAvailableChunk == nil && dataChunk.isAvailable(config.MaxBytesPerCell) {
 				file.LastAvailableChunk = dataChunk
 			}
 		}
@@ -248,7 +248,7 @@ func (s *SheetFile) WriteCellChunk(row, col uint32, tx *gorm.DB) (*Cell, *Chunk,
 			newCellSize = config.BytesPerChunk
 		}
 		// For a new Cell, tries to add it to s.LastAvailableChunk
-		if s.LastAvailableChunk != nil && s.LastAvailableChunk.IsAvailable(newCellSize) {
+		if s.LastAvailableChunk != nil && s.LastAvailableChunk.isAvailable(newCellSize) {
 			// There is a empty slot for the new Cell, add it to s.LastAvailableChunk
 			cell = s.addCellToLastAvailable(row, col, newCellSize)
 			return cell.Snapshot(), s.LastAvailableChunk.Snapshot(), nil

@@ -93,12 +93,12 @@ func TestChunk_IsAvailable(t *testing.T) {
 		chunk4.Cells = []*Cell{
 			NewCell(config.SheetMetaCellID, 0, config.BytesPerChunk, 0, "sheet0"),
 		}
-		Convey("test IsAvailable", func() {
-			So(chunk1.IsAvailable(config.MaxBytesPerCell), ShouldEqual, true)
-			So(chunk1.IsAvailable(config.BytesPerChunk), ShouldEqual, false)
-			So(chunk2.IsAvailable(config.MaxBytesPerCell), ShouldEqual, true)
-			So(chunk3.IsAvailable(config.MaxBytesPerCell), ShouldEqual, false)
-			So(chunk4.IsAvailable(config.MaxBytesPerCell), ShouldEqual, false)
+		Convey("test isAvailable", func() {
+			So(chunk1.isAvailable(config.MaxBytesPerCell), ShouldEqual, true)
+			So(chunk1.isAvailable(config.BytesPerChunk), ShouldEqual, false)
+			So(chunk2.isAvailable(config.MaxBytesPerCell), ShouldEqual, true)
+			So(chunk3.isAvailable(config.MaxBytesPerCell), ShouldEqual, false)
+			So(chunk4.isAvailable(config.MaxBytesPerCell), ShouldEqual, false)
 		})
 	})
 }
@@ -113,7 +113,7 @@ func TestChunk_Snapshot(t *testing.T) {
 		Convey("test snapshot", func() {
 			c := chunk1.Snapshot()
 			So(c, ShouldNotEqual, chunk1)
-			So(c.Cells, ShouldBeNil)
+			So(len(c.Cells), ShouldEqual, 2)
 			So(c.Version == chunk1.Version && c.DataNode == chunk1.DataNode, ShouldBeTrue)
 		})
 	})

@@ -34,10 +34,10 @@ type Chunk struct {
 }
 
 /*
-IsAvailable
+isAvailable
 Returns true if c is available to store a new Cell with given size.
 */
-func (c *Chunk) IsAvailable(size uint64) bool {
+func (c *Chunk) isAvailable(size uint64) bool {
 	used := uint64(0)
 	for _, cell := range c.Cells {
 		used += cell.Size
@@ -61,7 +61,6 @@ func (c *Chunk) Persistent(tx *gorm.DB) {
 Snapshot
 Returns a *Chunk points to the copy of c.
 See SheetFile for the necessity of Snapshot.
-Cells is removed in the snapshot.
 
 @return
 	*Chunk points to the copy of c.
@@ -69,7 +68,9 @@ Cells is removed in the snapshot.
 func (c *Chunk) Snapshot() *Chunk {
 	var nc Chunk
 	nc = *c
-	nc.Cells = nil
+	for i, cell := range c.Cells {
+		nc.Cells[i] = cell.Snapshot()
+	}
 	return &nc
 }
 
