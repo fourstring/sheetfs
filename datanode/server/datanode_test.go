@@ -1,7 +1,8 @@
-package main
+package server
 
 import (
 	"context"
+	"fmt"
 	"io/ioutil"
 	"os"
 	"path"
@@ -55,6 +56,20 @@ func TestDatanode(t *testing.T) {
 	readReq = fsrpc.ReadChunkRequest{Id: 1, Size: 25, Version: 2}
 	readRes, _ = s.ReadChunk(context.Background(), &readReq)
 	if string(readRes.Data) != "this is the new test data" {
+		t.Error("wrong")
+	}
+
+	// second write
+	testString = "second test data"
+	data = []byte(testString)
+	size = len(testString)
+	req = fsrpc.WriteChunkRequest{Id: 1, Data: data, Size: uint64(size), Padding: " ", Version: 2}
+	_, _ = s.WriteChunk(context.Background(), &req)
+
+	readReq = fsrpc.ReadChunkRequest{Id: 1, Size: 25, Version: 3}
+	readRes, _ = s.ReadChunk(context.Background(), &readReq)
+	if string(readRes.Data) != "second test data" {
+		fmt.Printf("%s", string(readRes.Data))
 		t.Error("wrong")
 	}
 

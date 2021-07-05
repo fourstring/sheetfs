@@ -2,7 +2,6 @@ package client
 
 import (
 	"context"
-	"flag"
 	"google.golang.org/grpc"
 	"io/fs"
 	"log"
@@ -12,7 +11,6 @@ import (
 	"sync"
 )
 
-var address = flag.String("a", "", "address to which the master listens")
 var g *Global
 
 type Global struct {
@@ -23,13 +21,27 @@ type Global struct {
 
 func init() {
 	// Set up a connection to the server.
-	conn, err := grpc.Dial(*address, grpc.WithInsecure(), grpc.WithBlock())
+	/*conn, err := grpc.Dial(*address, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
 	master := fsrpc.NewMasterNodeClient(conn)
 
 	if g == nil {
+		g = &Global{
+			masterClient: master,
+			ctx:          context.Background(),
+		}
+	}*/
+}
+
+func Init(masterAddr string) {
+	if g == nil {
+		conn, err := grpc.Dial(masterAddr, grpc.WithInsecure(), grpc.WithBlock())
+		if err != nil {
+			log.Fatalf("did not connect: %v", err)
+		}
+		master := fsrpc.NewMasterNodeClient(conn)
 		g = &Global{
 			masterClient: master,
 			ctx:          context.Background(),

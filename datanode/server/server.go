@@ -1,9 +1,10 @@
-package main
+package server
 
 import (
 	"context"
 	"fmt"
 	"os"
+	"sheetfs/datanode/utils"
 	fsrpc "sheetfs/protocol"
 )
 
@@ -11,10 +12,14 @@ type server struct {
 	fsrpc.UnimplementedDataNodeServer
 }
 
+func NewServer() *server {
+	return &server{}
+}
+
 func (s *server) DeleteChunk(ctx context.Context, request *fsrpc.DeleteChunkRequest) (*fsrpc.DeleteChunkReply, error) {
 	reply := new(fsrpc.DeleteChunkReply)
 	reply.Status = fsrpc.Status_OK
-	err := os.Remove(getFilename(request.Id))
+	err := os.Remove(utils.GetFilename(request.Id))
 	if err != nil {
 		print("not delete")
 	}
@@ -24,7 +29,7 @@ func (s *server) DeleteChunk(ctx context.Context, request *fsrpc.DeleteChunkRequ
 func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest) (*fsrpc.ReadChunkReply, error) {
 	reply := new(fsrpc.ReadChunkReply)
 
-	file, err := os.Open(getFilename(request.Id))
+	file, err := os.Open(utils.GetFilename(request.Id))
 
 	// this file does not exist
 	if err != nil {
@@ -34,7 +39,7 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 	}
 
 	// check version
-	curVersion := getVersion(file)
+	curVersion := utils.GetVersion(file)
 	if curVersion < request.Version {
 		// the version is correct
 		data := make([]byte, request.Size)
@@ -61,34 +66,34 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkRequest) (*fsrpc.WriteChunkReply, error) {
 	reply := new(fsrpc.WriteChunkReply)
 
-	file, err := os.OpenFile(getFilename(request.Id), os.O_RDWR, 0755)
+	file, err := os.OpenFile(utils.GetFilename(request.Id), os.O_RDWR, 0755)
 
 	// first time
 	if err != nil {
 		// create the file
-		file, err := os.Create(getFilename(request.Id))
+		file, err := os.Create(utils.GetFilename(request.Id))
 		if err != nil {
 			fmt.Println(err)
 			return nil, nil
 		}
 		// write the data
-		_, err = file.WriteAt(getPaddedFile(request.Data, request.Size,
+		_, err = file.WriteAt(utils.GetPaddedFile(request.Data, request.Size,
 			request.Padding, request.Offset), int64(request.Offset))
 		if err != nil {
 			return nil, err
 		}
 
 		// update the version
-		SyncAndUpdateVersion(file, request.Version)
+		utils.SyncAndUpdateVersion(file, request.Version)
 		reply.Status = fsrpc.Status_OK
 		return reply, nil
 	}
 
-	curVersion := getVersion(file)
+	curVersion := utils.GetVersion(file)
 	if curVersion+1 == request.Version {
 		// can update
 		// write the data
-		_, err := file.WriteAt(getPaddedData(request.Data, request.Size, request.Padding),
+		_, err := file.WriteAt(utils.GetPaddedData(request.Data, request.Size, request.Padding),
 			int64(request.Offset))
 		if err != nil {
 			file.Close()
@@ -97,7 +102,7 @@ func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 		}
 
 		// update the version
-		SyncAndUpdateVersion(file, request.Version)
+		utils.SyncAndUpdateVersion(file, request.Version)
 
 		reply.Status = fsrpc.Status_OK
 		return reply, nil

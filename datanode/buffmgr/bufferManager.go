@@ -1,4 +1,4 @@
-package main
+package buffmgr
 
 //var buffermanager *BufferManager
 //
@@ -7,7 +7,7 @@ package main
 //	blankFile  []byte
 //}
 
-func getPaddedBytes(s string, size int) []byte {
+func GetPaddedBytes(s string, size int) []byte {
 	// Fill padding with padByte.
 	padByte := []byte(s)[0]
 	paddedData := make([]byte, size)
@@ -20,8 +20,8 @@ func getPaddedBytes(s string, size int) []byte {
 //func init() {
 //	if buffermanager == nil {
 //		buffermanager = &BufferManager{
-//			getPaddedBytes(" ", config.BLOCK_SIZE),
-//			getPaddedBytes(" ", config.FILE_SIZE),
+//			GetPaddedBytes(" ", config.BLOCK_SIZE),
+//			GetPaddedBytes(" ", config.FILE_SIZE),
 //		}
 //	}
 //}

@@ -6,6 +6,7 @@ import (
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"sheetfs/datanode/server"
 	fsrpc "sheetfs/protocol"
 )
 
@@ -20,9 +21,9 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	fsrpc.RegisterDataNodeServer(s, &server{})
+	fsrpc.RegisterDataNodeServer(s, server.NewServer())
 
-	conn, err := grpc.Dial(*masterAddr)
+	conn, err := grpc.Dial(*masterAddr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
 		log.Fatalf("%s", err)
 	}
