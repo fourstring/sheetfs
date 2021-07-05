@@ -1,13 +1,11 @@
 package main
 
-import "sheetfs/config"
-
-var buffermanager *BufferManager
-
-type BufferManager struct {
-	blankBlock []byte
-	blankFile  []byte
-}
+//var buffermanager *BufferManager
+//
+//type BufferManager struct {
+//	blankBlock []byte
+//	blankFile  []byte
+//}
 
 func getPaddedBytes(s string, size int) []byte {
 	// Fill padding with padByte.
@@ -19,11 +17,11 @@ func getPaddedBytes(s string, size int) []byte {
 	return paddedData
 }
 
-func init() {
-	if buffermanager == nil {
-		buffermanager = &BufferManager{
-			getPaddedBytes(" ", config.BLOCK_SIZE),
-			getPaddedBytes(" ", config.FILE_SIZE),
-		}
-	}
-}
+//func init() {
+//	if buffermanager == nil {
+//		buffermanager = &BufferManager{
+//			getPaddedBytes(" ", config.BLOCK_SIZE),
+//			getPaddedBytes(" ", config.FILE_SIZE),
+//		}
+//	}
+//}

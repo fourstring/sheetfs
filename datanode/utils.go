@@ -26,13 +26,14 @@ func getFilename(id uint64) string {
 func getPaddedData(data []byte, size uint64, padding string) []byte {
 	// Fill padding with padByte.
 	var paddedData []byte
-	switch padding {
-	case " ":
-		paddedData = buffermanager.blankBlock
-		break
-	default:
-		getPaddedBytes(padding, config.BLOCK_SIZE)
-	}
+	//switch padding {
+	//case " ":
+	//	copy(paddedData, buffermanager.blankBlock)
+	//	break
+	//default:
+	//	getPaddedBytes(padding, config.BLOCK_SIZE)
+	//}
+	getPaddedBytes(padding, config.BLOCK_SIZE)
 
 	copy(paddedData[:size+1], data)
 	return paddedData
@@ -41,13 +42,14 @@ func getPaddedData(data []byte, size uint64, padding string) []byte {
 func getPaddedFile(data []byte, size uint64, padding string, offset uint64) []byte {
 	// Fill padding with padByte.
 	var paddedData []byte
-	switch padding {
-	case " ":
-		paddedData = buffermanager.blankFile
-		break
-	default:
-		getPaddedBytes(padding, config.FILE_SIZE)
-	}
+	//switch padding {
+	//case " ":
+	//	copy(paddedData, buffermanager.blankFile)
+	//	break
+	//default:
+	//	getPaddedBytes(padding, config.FILE_SIZE)
+	//}
+	getPaddedBytes(padding, config.FILE_SIZE)
 
 	copy(paddedData[offset:offset+size+1], data)
 	return paddedData

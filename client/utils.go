@@ -83,16 +83,14 @@ func ConcurrentWriteChunk(ctx context.Context, in *fsrpc.WriteChunkRequest, opts
 
 func CheckNewDataNode(reply *fsrpc.ReadSheetReply) {
 	chunks := reply.Chunks
-	conn, err := grpc.Dial(*address, grpc.WithInsecure(), grpc.WithBlock())
-	if err != nil {
-		log.Fatalf("did not connect: %v", err)
-	}
 
 	for _, chunk := range chunks {
 		if _, ok := g.datanodeClientMap[chunk.Datanode]; !ok {
+			conn, err := grpc.Dial(chunk.Datanode, grpc.WithInsecure(), grpc.WithBlock())
+			if err != nil {
+				log.Fatalf("did not connect: %v", err)
+			}
 			g.datanodeClientMap[chunk.Datanode] = fsrpc.NewDataNodeClient(conn)
 		}
 	}
-
-	defer conn.Close()
 }

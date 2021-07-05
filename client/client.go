@@ -28,7 +28,6 @@ func init() {
 		log.Fatalf("did not connect: %v", err)
 	}
 	master := fsrpc.NewMasterNodeClient(conn)
-	defer conn.Close()
 
 	if g == nil {
 		g = &Global{
@@ -165,6 +164,7 @@ func (f *File) Read(b []byte) (n int64, err error) {
 		wg.Add(1)
 
 		// start a new goroutine
+		chunk := chunk
 		go func() {
 			// get the whole chunk data
 			dataReq := fsrpc.ReadChunkRequest{
@@ -260,12 +260,12 @@ WriteAt
 */
 func (f *File) WriteAt(b []byte, col uint32, row uint32, padding string) (n int64, err error) {
 	// read cell to get metadata
-	masterReq := fsrpc.ReadCellRequest{
+	masterReq := fsrpc.WriteCellRequest{
 		Fd:     f.Fd,
 		Column: col,
 		Row:    row,
 	}
-	masterReply, err := g.masterClient.ReadCell(g.ctx, &masterReq)
+	masterReply, err := g.masterClient.WriteCell(g.ctx, &masterReq)
 
 	if err != nil {
 		return -1, err
