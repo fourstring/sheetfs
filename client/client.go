@@ -13,12 +13,12 @@ import (
 )
 
 var address = flag.String("a", "", "address to which the master listens")
-var s *Server
+var g *Global
 
-type Server struct {
-	masterServer   fsrpc.MasterNodeClient
-	datanodeServer fsrpc.DataNodeClient
-	ctx            context.Context
+type Global struct {
+	masterClient      fsrpc.MasterNodeClient
+	datanodeClientMap map[string]fsrpc.DataNodeClient
+	ctx               context.Context
 }
 
 func init() {
@@ -27,16 +27,13 @@ func init() {
 	if err != nil {
 		log.Fatalf("did not connect: %v", err)
 	}
+	master := fsrpc.NewMasterNodeClient(conn)
 	defer conn.Close()
 
-	master := fsrpc.NewMasterNodeClient(conn)
-	datanode := fsrpc.NewDataNodeClient(conn)
-
-	if s == nil {
-		s = &Server{
-			masterServer:   master,
-			datanodeServer: datanode,
-			ctx:            context.Background(),
+	if g == nil {
+		g = &Global{
+			masterClient: master,
+			ctx:          context.Background(),
 		}
 	}
 }
@@ -59,7 +56,7 @@ func Create(name string) (f *File, err error) {
 	}
 	// create the file
 	req := fsrpc.CreateSheetRequest{Filename: name}
-	reply, err := s.masterServer.CreateSheet(s.ctx, &req)
+	reply, err := g.masterClient.CreateSheet(g.ctx, &req)
 
 	if err != nil {
 		return nil, err
@@ -87,7 +84,7 @@ Delete
 func Delete(name string) (err error) {
 	// DeleteSheet
 	req := fsrpc.DeleteSheetRequest{Filename: name}
-	reply, err := s.masterServer.DeleteSheet(s.ctx, &req)
+	reply, err := g.masterClient.DeleteSheet(g.ctx, &req)
 
 	if err != nil {
 		return err
@@ -119,7 +116,7 @@ func Open(name string) (f *File, err error) {
 	}
 	// open the required file
 	req := fsrpc.OpenSheetRequest{Filename: name}
-	reply, err := s.masterServer.OpenSheet(s.ctx, &req)
+	reply, err := g.masterClient.OpenSheet(g.ctx, &req)
 
 	if err != nil {
 		return nil, err
@@ -146,12 +143,13 @@ Read
 func (f *File) Read(b []byte) (n int64, err error) {
 	// read whole sheet
 	masterReq := fsrpc.ReadSheetRequest{Fd: f.Fd}
-	masterReply, err := s.masterServer.ReadSheet(s.ctx, &masterReq)
+	masterReply, err := g.masterClient.ReadSheet(g.ctx, &masterReq)
 
 	// check read reply
 	if err != nil {
 		return -1, err
 	}
+	CheckNewDataNode(masterReply)
 
 	if masterReply.Status != fsrpc.Status_OK {
 		// have fd so not found must due to some invalid para
@@ -164,10 +162,9 @@ func (f *File) Read(b []byte) (n int64, err error) {
 	var metaData []byte
 
 	for _, chunk := range masterReply.Chunks {
-		// 每一个任务开始时, 将等待组增加1
 		wg.Add(1)
 
-		// 开启一个新的 goroutine
+		// start a new goroutine
 		go func() {
 			// get the whole chunk data
 			dataReq := fsrpc.ReadChunkRequest{
@@ -176,7 +173,7 @@ func (f *File) Read(b []byte) (n int64, err error) {
 				Size:    config.FILE_SIZE,
 				Version: chunk.Version,
 			}
-			dataReply, err := s.datanodeServer.ReadChunk(s.ctx, &dataReq)
+			dataReply, err := ConcurrentReadChunk(g.ctx, &dataReq)
 
 			if err != nil || dataReply.Status != fsrpc.Status_OK {
 				print("data chunk mismatch master chunk")
@@ -189,11 +186,10 @@ func (f *File) Read(b []byte) (n int64, err error) {
 				data = append(data, ","...)
 			}
 
-			// 使用defer, 表示函数完成时将等待组值减1
 			defer wg.Done()
 		}()
 	}
-	// 等待所有的任务完成
+	// wait for all tasks finish
 	wg.Wait()
 
 	// convert to JSON
@@ -217,7 +213,7 @@ func (f *File) ReadAt(b []byte, col uint32, row uint32) (n int64, err error) {
 		Column: col,
 		Row:    row,
 	}
-	masterReply, err := s.masterServer.ReadCell(s.ctx, &masterReq)
+	masterReply, err := g.masterClient.ReadCell(g.ctx, &masterReq)
 
 	if err != nil {
 		return -1, err
@@ -234,7 +230,7 @@ func (f *File) ReadAt(b []byte, col uint32, row uint32) (n int64, err error) {
 		Size:    masterReply.Cell.Size,
 		Version: masterReply.Cell.Chunk.Version,
 	}
-	dataReply, err := s.datanodeServer.ReadChunk(s.ctx, &dataReq)
+	dataReply, err := ConcurrentReadChunk(g.ctx, &dataReq)
 
 	if err != nil {
 		return -1, err
@@ -269,7 +265,7 @@ func (f *File) WriteAt(b []byte, col uint32, row uint32, padding string) (n int6
 		Column: col,
 		Row:    row,
 	}
-	masterReply, err := s.masterServer.ReadCell(s.ctx, &masterReq)
+	masterReply, err := g.masterClient.ReadCell(g.ctx, &masterReq)
 
 	if err != nil {
 		return -1, err
@@ -303,7 +299,7 @@ func (f *File) WriteAt(b []byte, col uint32, row uint32, padding string) (n int6
 		Padding: padding,
 		Data:    b,
 	}
-	dataReply, err := s.datanodeServer.WriteChunk(s.ctx, &dataReq)
+	dataReply, err := ConcurrentWriteChunk(g.ctx, &dataReq)
 
 	if err != nil {
 		return -1, err
