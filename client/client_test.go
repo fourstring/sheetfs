@@ -255,8 +255,7 @@ func TestReadAndWrite(t *testing.T) {
 		Convey("Read empty file after create", func() {
 			file, err := Create("test file")
 
-			read := make([]byte, 1024)
-			_, err = file.Read(read) // must call this before write
+			read, _, _ := file.Read() // must call this before write
 
 			header := []byte("{\"celldata\": []}")
 			So(read[:len(header)], ShouldResemble, header)
@@ -293,7 +292,7 @@ func TestComplicatedReadAndWrite(t *testing.T) {
 		// var file File
 		Convey("Read empty file after create", func() {
 			file, err := Create("test file")
-			file.Read([]byte{}) // must call this before write
+			file.Read() // must call this before write
 
 			// read := make([]byte, 1024)
 			for col := 0; col < 10; col++ {
@@ -302,10 +301,8 @@ func TestComplicatedReadAndWrite(t *testing.T) {
 					file.WriteAt(b, uint32(col), uint32(row), " ")
 				}
 			}
-
-			read := make([]byte, 1024*100)
-			_, err = file.Read(read) // must call this before write
-
+			read, size, err := file.Read() // must call this before write
+			So(len(read), ShouldEqual, size)
 			So(err, ShouldBeNil)
 		})
 	})
@@ -327,7 +324,7 @@ func TestConcurrentWrite(t *testing.T) {
 		// var file File
 		Convey("Read empty file after create", func() {
 			file, err := Create("test file")
-			file.Read([]byte{}) // must call this before write
+			file.Read() // must call this before write
 
 			// read := make([]byte, 1024)
 			for col := 0; col < 10; col++ {
@@ -341,9 +338,8 @@ func TestConcurrentWrite(t *testing.T) {
 				}
 			}
 
-			read := make([]byte, 1024*100)
-			_, err = file.Read(read) // must call this before write
-
+			read, size, err := file.Read() // must call this before write
+			So(len(read), ShouldEqual, size)
 			So(err, ShouldBeNil)
 		})
 	})

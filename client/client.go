@@ -152,20 +152,20 @@ Read
 	n(int64): the read size, -1 if error
 	error(error)
 */
-func (f *File) Read(b []byte) (n int64, err error) {
+func (f *File) Read() (b []byte, n int64, err error) {
 	// read whole sheet
 	masterReq := fsrpc.ReadSheetRequest{Fd: f.Fd}
 	masterReply, err := g.masterClient.ReadSheet(g.ctx, &masterReq)
 
 	// check read reply
 	if err != nil {
-		return -1, err
+		return []byte{}, -1, err
 	}
 	CheckNewDataNode(masterReply)
 
 	if masterReply.Status != fsrpc.Status_OK {
 		// have fd so not found must due to some invalid para
-		return -1, fs.ErrInvalid
+		return []byte{}, -1, fs.ErrInvalid
 	}
 
 	// read every chunk of the file
@@ -212,9 +212,9 @@ func (f *File) Read(b []byte) (n int64, err error) {
 	//	b[i] = src[i]
 	//}
 	//b = append(b, src[len(b):]...)
-	copy(b, connect(data, metaData))
+	res := connect(data, metaData)
 
-	return int64(len(b)), nil
+	return res, int64(len(res)), nil
 }
 
 /*
