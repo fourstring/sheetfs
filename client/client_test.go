@@ -22,6 +22,18 @@ var FileLockMap sync.Map
 var maxRetry = 10
 var masterSrv, datanodeSrv *grpc.Server
 
+func constructData(col uint32, row uint32) []byte {
+	return []byte("{\n" +
+		"\"c\": " + fmt.Sprint(col) + ",\n" +
+		"\"r\": " + fmt.Sprint(row) + ",\n" +
+		"\"v\": {\n" +
+		"\"ct\": {\"fa\": \"General\",\"t\": \"g\"},\n" +
+		"\"m\": \"ww\",\n" +
+		"\"v\": \"ww\"\n" +
+		"}\n" +
+		"}")
+}
+
 /*
 Start a MasterNode and a DataNode for testing. The db used by MasterNode is sqlite
 per-connection independent in-memory one, and all chunks on disk will be removed in
@@ -262,19 +274,77 @@ func TestReadAndWrite(t *testing.T) {
 			So(size, ShouldEqual, 2048)
 			So(err, ShouldBeNil)
 		})
+	})
+}
 
-		//Convey("ReadAt the same after WriteAt", func() {
-		//	read := make([]byte, 1024)
-		//	b := []byte("this is test")
-		//
-		//	size, err := file.WriteAt(b, 0, 0, " ")
-		//	So(size, ShouldEqual, len(b))
-		//	So(err, ShouldBeNil)
-		//
-		//	size, err = file.ReadAt(read, 0, 0)
-		//	So(read[:len(b)], ShouldEqual, b)
-		//	So(size, ShouldResemble, 2048)
-		//	So(err, ShouldBeNil)
-		//})
+func TestComplicatedReadAndWrite(t *testing.T) {
+	Convey("Start test servers", t, func() {
+		// Booting up testing nodes
+		masterAddr, datanodeAddr, err := startNodes()
+		// call stopNodes unconditionally (although err!=nil)
+		defer stopNodes()
+		So(err, ShouldBeNil)
+		// register DataNode created to MasterNode
+		status := registerDataNode(masterAddr, datanodeAddr)
+		So(status, ShouldEqual, fs_rpc.Status_OK)
+		// Init client library
+		Init(masterAddr)
+
+		// var file File
+		Convey("Read empty file after create", func() {
+			file, err := Create("test file")
+			file.Read([]byte{}) // must call this before write
+
+			// read := make([]byte, 1024)
+			for col := 0; col < 10; col++ {
+				for row := 0; row < 10; row++ {
+					b := constructData(uint32(col), uint32(row))
+					file.WriteAt(b, uint32(col), uint32(row), " ")
+				}
+			}
+
+			read := make([]byte, 1024*100)
+			_, err = file.Read(read) // must call this before write
+
+			So(err, ShouldBeNil)
+		})
+	})
+}
+
+func TestConcurrentWrite(t *testing.T) {
+	Convey("Start test servers", t, func() {
+		// Booting up testing nodes
+		masterAddr, datanodeAddr, err := startNodes()
+		// call stopNodes unconditionally (although err!=nil)
+		defer stopNodes()
+		So(err, ShouldBeNil)
+		// register DataNode created to MasterNode
+		status := registerDataNode(masterAddr, datanodeAddr)
+		So(status, ShouldEqual, fs_rpc.Status_OK)
+		// Init client library
+		Init(masterAddr)
+
+		// var file File
+		Convey("Read empty file after create", func() {
+			file, err := Create("test file")
+			file.Read([]byte{}) // must call this before write
+
+			// read := make([]byte, 1024)
+			for col := 0; col < 10; col++ {
+				for row := 0; row < 10; row++ {
+					row := row
+					col := col
+					go func() {
+						b := constructData(uint32(col), uint32(row))
+						file.WriteAt(b, uint32(col), uint32(row), " ")
+					}()
+				}
+			}
+
+			read := make([]byte, 1024*100)
+			_, err = file.Read(read) // must call this before write
+
+			So(err, ShouldBeNil)
+		})
 	})
 }

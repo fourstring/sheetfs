@@ -208,7 +208,7 @@ func (f *File) Read(b []byte) (n int64, err error) {
 	// convert to JSON
 	// DynamicCopy(&b, connect(data, metaData))
 	//src := connect(data, metaData)
-	//for i := 0; i < len(b); i++ {
+	//for i := 0; i < len(b) && i < len(src); i++ {
 	//	b[i] = src[i]
 	//}
 	//b = append(b, src[len(b):]...)
