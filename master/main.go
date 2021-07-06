@@ -5,6 +5,7 @@ import (
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"sheetfs/master/server"
 	fs_rpc "sheetfs/protocol"
 )
 
@@ -20,7 +21,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	master, err := NewServer(db)
+	master, err := server.NewServer(db)
 	if err != nil {
 		log.Fatal(err)
 	}

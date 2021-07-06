@@ -1,0 +1,7 @@
+package config
+
+const FILE_LOCATION = "<ROOT>\\data\\"
+const BLOCK_SIZE = 2 << 10
+const FILE_SIZE = BLOCK_SIZE << 2
+const VERSION_START_LOCATION = BLOCK_SIZE << 2
+const SPECIAL_ID = ^uint64(0)
