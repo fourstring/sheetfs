@@ -28,25 +28,27 @@ func shouldBeSameEntry(actual interface{}, expected ...interface{}) string {
 	}
 }
 
-func newTestFileManager() (*FileManager, *gorm.DB, error) {
+func newTestFileManager() (*FileManager, *gorm.DB, *datanode_alloc.DataNodeAllocator, error) {
 	db, err := tests.GetTestDB(&sheetfile.Chunk{}, &MapEntry{})
 	if err != nil {
-		return nil, nil, err
+		return nil, nil, nil, err
 	}
-	datanode_alloc.AddDataNode("node1")
+	alloc := datanode_alloc.NewDataNodeAllocator()
+	alloc.AddDataNode("node1")
 	fm := &FileManager{
 		entries: map[string]*MapEntry{},
 		opened:  map[string]*sheetfile.SheetFile{},
 		fds:     map[uint64]string{},
 		nextFd:  0,
 		db:      db,
+		alloc:   alloc,
 	}
-	return fm, db, nil
+	return fm, db, alloc, nil
 }
 
 func TestFileManager_CreateSheet(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, _, err := newTestFileManager()
+		fm, _, _, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		Convey("Create file", func() {
 			for i := 0; i < 2; i++ {
@@ -72,7 +74,7 @@ func TestFileManager_CreateSheet(t *testing.T) {
 
 func TestFileManager_OpenSheet(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, _, err := newTestFileManager()
+		fm, _, _, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		fd, err := fm.CreateSheet("sheet0")
 		Convey("Open created file", func() {
@@ -93,7 +95,7 @@ func TestFileManager_OpenSheet(t *testing.T) {
 
 func TestFileManager_Persistent(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, db, err := newTestFileManager()
+		fm, db, alloc, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		_, err = fm.CreateSheet("sheet0")
 		So(err, ShouldBeNil)
@@ -104,7 +106,7 @@ func TestFileManager_Persistent(t *testing.T) {
 		Convey("Persist FileManager", func() {
 			// Cells data of a newly created SheetFile is not flushed into sqlite
 			// until FileManager.Persistent() is called.
-			sheet0 := sheetfile.LoadSheetFile(db, "sheet0")
+			sheet0 := sheetfile.LoadSheetFile(db, alloc, "sheet0")
 			So(len(sheet0.Cells), ShouldEqual, 0)
 			err = fm.Persistent()
 			So(err, ShouldBeNil)
@@ -113,7 +115,7 @@ func TestFileManager_Persistent(t *testing.T) {
 			So(len(entries), ShouldEqual, 3)
 			for i := 0; i < 3; i++ {
 				filename := fmt.Sprintf("sheet%d", i)
-				sheet := sheetfile.LoadSheetFile(db, filename)
+				sheet := sheetfile.LoadSheetFile(db, alloc, filename)
 				So(len(sheet.Cells), ShouldEqual, 1)
 			}
 		})
@@ -122,7 +124,7 @@ func TestFileManager_Persistent(t *testing.T) {
 
 func TestLoadFileManager(t *testing.T) {
 	Convey("Construct test FileManager and persist it", t, func() {
-		fm, db, err := newTestFileManager()
+		fm, db, alloc, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		_, err = fm.CreateSheet("sheet0")
 		So(err, ShouldBeNil)
@@ -133,7 +135,7 @@ func TestLoadFileManager(t *testing.T) {
 		err = fm.Persistent()
 		So(err, ShouldBeNil)
 		Convey("Load FileManager", func() {
-			fm = LoadFileManager(db)
+			fm = LoadFileManager(db, alloc)
 			So(len(fm.entries), ShouldEqual, 3)
 			for i := 0; i < 3; i++ {
 				filename := fmt.Sprintf("sheet%d", i)
@@ -145,7 +147,7 @@ func TestLoadFileManager(t *testing.T) {
 
 func TestFileManager_RecycleSheet(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, _, err := newTestFileManager()
+		fm, _, _, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		fd, err := fm.CreateSheet("sheet0")
 		Convey("Recycle a sheet", func() {
@@ -160,7 +162,7 @@ func TestFileManager_RecycleSheet(t *testing.T) {
 
 func TestFileManager_ResumeSheet(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, _, err := newTestFileManager()
+		fm, _, _, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		fd, err := fm.CreateSheet("sheet0")
 		Convey("Recycle a sheet", func() {
@@ -182,7 +184,7 @@ func TestFileManager_ResumeSheet(t *testing.T) {
 
 func TestFileManager_GetAllSheets(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, _, err := newTestFileManager()
+		fm, _, _, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		Convey("Create test files", func() {
 			for i := 0; i < 10; i++ {
@@ -210,7 +212,7 @@ func TestFileManager_GetAllSheets(t *testing.T) {
 
 func TestFileManager_WriteFileCell(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, _, err := newTestFileManager()
+		fm, _, _, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		fd, err := fm.CreateSheet("sheet0")
 		So(err, ShouldBeNil)
@@ -231,7 +233,7 @@ func TestFileManager_WriteFileCell(t *testing.T) {
 
 func TestFileManager_ReadSheet(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, _, err := newTestFileManager()
+		fm, _, _, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		fd, err := fm.CreateSheet("sheet0")
 		So(err, ShouldBeNil)
@@ -253,7 +255,7 @@ func TestFileManager_ReadSheet(t *testing.T) {
 
 func TestFileManager_ReadFileCell(t *testing.T) {
 	Convey("Construct test FileManager", t, func() {
-		fm, _, err := newTestFileManager()
+		fm, _, _, err := newTestFileManager()
 		So(err, ShouldBeNil)
 		fd, err := fm.CreateSheet("sheet0")
 		So(err, ShouldBeNil)

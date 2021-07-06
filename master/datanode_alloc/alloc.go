@@ -16,17 +16,15 @@ type DataNodeAllocator struct {
 	curPos       uint
 }
 
-var allocator *DataNodeAllocator
-
-func init() {
-	allocator = &DataNodeAllocator{
+func NewDataNodeAllocator() *DataNodeAllocator {
+	return &DataNodeAllocator{
 		dataNodes:    []*dataNode{},
 		dataNodesSet: map[string]struct{}{},
 		curPos:       0,
 	}
 }
 
-func (c *DataNodeAllocator) addDataNode(address string) {
+func (c *DataNodeAllocator) AddDataNode(address string) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	_, ok := c.dataNodesSet[address]
@@ -39,25 +37,13 @@ func (c *DataNodeAllocator) addDataNode(address string) {
 	c.dataNodesSet[address] = struct{}{}
 }
 
-func (c *DataNodeAllocator) allocateNode() string {
+func (c *DataNodeAllocator) AllocateNode() (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.dataNodes) == 0 {
-		return ""
+		return "", &errors.NoDataNodeError{}
 	}
 	node := c.dataNodes[c.curPos].address
 	c.curPos = (c.curPos + 1) % uint(len(c.dataNodes))
-	return node
-}
-
-func AllocateNode() (string, error) {
-	node := allocator.allocateNode()
-	if node == "" {
-		return "", &errors.NoDataNodeError{}
-	}
 	return node, nil
-}
-
-func AddDataNode(address string) {
-	allocator.addDataNode(address)
 }

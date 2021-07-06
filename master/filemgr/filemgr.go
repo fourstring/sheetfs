@@ -2,6 +2,7 @@ package filemgr
 
 import (
 	"gorm.io/gorm"
+	"sheetfs/master/datanode_alloc"
 	"sheetfs/master/errors"
 	"sheetfs/master/sheetfile"
 	fs_rpc "sheetfs/protocol"
@@ -65,6 +66,7 @@ type FileManager struct {
 	// Next available fd to be allocated to respond a Open or Create file operation.
 	nextFd uint64
 	db     *gorm.DB
+	alloc  *datanode_alloc.DataNodeAllocator
 }
 
 /*
@@ -105,7 +107,7 @@ func (f *FileManager) openFile(filename string) (uint64, error) {
 	openedFile, ok := f.opened[filename]
 	if !ok {
 		// Load file metadata into memory from sqlite on-demand.
-		openedFile = sheetfile.LoadSheetFile(f.db, filename)
+		openedFile = sheetfile.LoadSheetFile(f.db, f.alloc, filename)
 		f.opened[filename] = openedFile
 	}
 	fd := f.allocFd()
@@ -156,7 +158,7 @@ func (f *FileManager) CreateSheet(filename string) (uint64, error) {
 	if ok {
 		return 0, errors.NewFileExistsError(filename)
 	}
-	sheet, err := sheetfile.CreateSheetFile(f.db, filename)
+	sheet, err := sheetfile.CreateSheetFile(f.db, f.alloc, filename)
 	if err != nil {
 		return 0, err
 	}
@@ -371,13 +373,14 @@ This method should only be used to load checkpoints in sqlite.
 @return
 	*FileManager
 */
-func LoadFileManager(db *gorm.DB) *FileManager {
+func LoadFileManager(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator) *FileManager {
 	fm := &FileManager{
 		entries: map[string]*MapEntry{},
 		opened:  map[string]*sheetfile.SheetFile{},
 		fds:     map[uint64]string{},
 		nextFd:  0,
 		db:      db,
+		alloc:   alloc,
 	}
 	var entries []*MapEntry
 	db.Find(&entries)

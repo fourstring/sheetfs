@@ -40,6 +40,7 @@ type SheetFile struct {
 	LastAvailableChunk *Chunk
 
 	filename string
+	alloc    *datanode_alloc.DataNodeAllocator
 }
 
 /*
@@ -61,18 +62,19 @@ the table here as a workaround.
 		*errors.NoDataNodeError: This function must allocate a Chunk for MetaCell, if there
 		are no DataNodes for storing this cell, returns NoDateNodeError.
 */
-func CreateSheetFile(db *gorm.DB, filename string) (*SheetFile, error) {
+func CreateSheetFile(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator, filename string) (*SheetFile, error) {
 	f := &SheetFile{
 		Chunks:             map[uint64]*Chunk{},
 		Cells:              map[int64]*Cell{},
 		LastAvailableChunk: nil,
 		filename:           filename,
+		alloc:              alloc,
 	}
 	err := f.persistentStructure(db)
 	if err != nil {
 		return nil, err
 	}
-	dataNode, err := datanode_alloc.AllocateNode()
+	dataNode, err := alloc.AllocateNode()
 	if err != nil {
 		return nil, err
 	}
@@ -107,12 +109,13 @@ This method should only be used to load checkpoints in sqlite. (See GetSheetCell
 @return
 	*SheetFile: pointer of loaded SheetFile.
 */
-func LoadSheetFile(db *gorm.DB, filename string) *SheetFile {
+func LoadSheetFile(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator, filename string) *SheetFile {
 	cells := GetSheetCellsAll(db, filename)
 	file := &SheetFile{
 		Chunks:   map[uint64]*Chunk{},
 		Cells:    map[int64]*Cell{},
 		filename: filename,
+		alloc:    alloc,
 	}
 	for _, cell := range cells {
 		// sheetName is ignored by gorm, not persist to sqlite
@@ -255,7 +258,7 @@ func (s *SheetFile) WriteCellChunk(row, col uint32, tx *gorm.DB) (*Cell, *Chunk,
 		} else {
 			// s.LastAvailableChunk has been fulfilled, allocate a new Chunk, and
 			// makes it s.LastAvailableChunk.
-			datanode, err := datanode_alloc.AllocateNode()
+			datanode, err := s.alloc.AllocateNode()
 			if err != nil {
 				// If there is no DataNode, *errors.NoDataNodeError will be returned.
 				return nil, nil, err

@@ -42,7 +42,7 @@ func NewFdNotFoundError(fd uint64) *FdNotFoundError {
 }
 
 func (f *FdNotFoundError) Error() string {
-	return fmt.Sprintf("Fd %d not found!", f.fd)
+	return fmt.Sprintf("fd %d not found!", f.fd)
 }
 
 type CellNotFoundError struct {

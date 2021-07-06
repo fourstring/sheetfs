@@ -5,49 +5,27 @@ import (
 	"google.golang.org/grpc"
 	"io/fs"
 	"log"
-	"sheetfs/config"
 	fsrpc "sheetfs/protocol"
 	"strings"
 	"sync"
 )
 
-var g *Global
-
-type Global struct {
+type Client struct {
+	mu                sync.RWMutex
 	masterClient      fsrpc.MasterNodeClient
 	datanodeClientMap map[string]fsrpc.DataNodeClient
-	ctx               context.Context
 }
 
-func init() {
-	// Set up a connection to the server.
-	/*conn, err := grpc.Dial(*address, grpc.WithInsecure(), grpc.WithBlock())
+func NewClient(masterAddr string) (*Client, error) {
+	conn, err := grpc.Dial(masterAddr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {
-		log.Fatalf("did not connect: %v", err)
+		return nil, err
 	}
-	master := fsrpc.NewMasterNodeClient(conn)
 
-	if g == nil {
-		g = &Global{
-			masterClient: master,
-			ctx:          context.Background(),
-		}
-	}*/
-}
-
-func Init(masterAddr string) {
-	if g == nil {
-		conn, err := grpc.Dial(masterAddr, grpc.WithInsecure(), grpc.WithBlock())
-		if err != nil {
-			log.Fatalf("did not connect: %v", err)
-		}
-		master := fsrpc.NewMasterNodeClient(conn)
-		g = &Global{
-			masterClient:      master,
-			datanodeClientMap: make(map[string]fsrpc.DataNodeClient),
-			ctx:               context.Background(),
-		}
-	}
+	return &Client{
+		masterClient:      fsrpc.NewMasterNodeClient(conn),
+		datanodeClientMap: map[string]fsrpc.DataNodeClient{},
+	}, nil
 }
 
 /*
@@ -60,7 +38,7 @@ Create
 				fs.ErrExist: already exist
 				fs.ErrInvalid: wrong para
 */
-func Create(name string) (f *File, err error) {
+func (c *Client) Create(ctx context.Context, name string) (f *File, err error) {
 	// check filename
 	if name == "" || strings.Contains(name, "/") ||
 		strings.Contains(name, "\\") {
@@ -68,7 +46,7 @@ func Create(name string) (f *File, err error) {
 	}
 	// create the file
 	req := fsrpc.CreateSheetRequest{Filename: name}
-	reply, err := g.masterClient.CreateSheet(g.ctx, &req)
+	reply, err := c.masterClient.CreateSheet(ctx, &req)
 
 	if err != nil {
 		return nil, err
@@ -76,7 +54,7 @@ func Create(name string) (f *File, err error) {
 
 	switch reply.Status {
 	case fsrpc.Status_OK:
-		return &File{Fd: reply.Fd}, nil
+		return newFile(reply.Fd, c), nil
 	case fsrpc.Status_Exist:
 		return nil, fs.ErrExist
 	default:
@@ -93,10 +71,10 @@ Delete
 				fs.ErrExist: already exist
 				fs.ErrInvalid: wrong para
 */
-func Delete(name string) (err error) {
+func (c *Client) Delete(ctx context.Context, name string) (err error) {
 	// DeleteSheet
 	req := fsrpc.DeleteSheetRequest{Filename: name}
-	reply, err := g.masterClient.DeleteSheet(g.ctx, &req)
+	reply, err := c.masterClient.DeleteSheet(ctx, &req)
 
 	if err != nil {
 		return err
@@ -120,7 +98,7 @@ Open
 	status(Status)
 	error(error)
 */
-func Open(name string) (f *File, err error) {
+func (c *Client) Open(ctx context.Context, name string) (f *File, err error) {
 	// check filename
 	if name == "" || strings.Contains(name, "/") ||
 		strings.Contains(name, "\\") {
@@ -128,7 +106,7 @@ func Open(name string) (f *File, err error) {
 	}
 	// open the required file
 	req := fsrpc.OpenSheetRequest{Filename: name}
-	reply, err := g.masterClient.OpenSheet(g.ctx, &req)
+	reply, err := c.masterClient.OpenSheet(ctx, &req)
 
 	if err != nil {
 		return nil, err
@@ -136,7 +114,7 @@ func Open(name string) (f *File, err error) {
 
 	switch reply.Status {
 	case fsrpc.Status_OK: // open correctly
-		return &File{Fd: reply.Fd}, err
+		return newFile(reply.Fd, c), err
 	case fsrpc.Status_NotFound: // not found
 		return nil, fs.ErrNotExist
 	default: // should never reach here
@@ -144,60 +122,47 @@ func Open(name string) (f *File, err error) {
 	}
 }
 
-/*
-Read
-@para
-	b([]byte): return the read data
-@return
-	n(int64): the read size, -1 if error
-	error(error)
-*/
-func (f *File) Read() (b []byte, n int64, err error) {
-	// read whole sheet
-	masterReq := fsrpc.ReadSheetRequest{Fd: f.Fd}
-	masterReply, err := g.masterClient.ReadSheet(g.ctx, &masterReq)
+func (c *Client) checkNewDataNode(reply *fsrpc.ReadSheetReply) {
+	c.mu.Lock()
+	defer c.mu.Unlock()
+	chunks := reply.Chunks
 
-	// check read reply
-	if err != nil {
-		return []byte{}, -1, err
+	for _, chunk := range chunks {
+		// register new client node
+		address := chunk.Datanode
+		if _, ok := c.datanodeClientMap[address]; !ok {
+			conn, err := grpc.Dial(address, grpc.WithInsecure(), grpc.WithBlock())
+			if err != nil {
+				log.Fatalf("did not connect: %v", err)
+			}
+			client := fsrpc.NewDataNodeClient(conn)
+			c.datanodeClientMap[address] = client
+		}
 	}
-	CheckNewDataNode(masterReply)
+}
 
-	if masterReply.Status != fsrpc.Status_OK {
-		// have fd so not found must due to some invalid para
-		return []byte{}, -1, fs.ErrInvalid
-	}
+func (c *Client) concurrentReadChunk(ctx context.Context, in *fsrpc.ReadChunkRequest, opts ...grpc.CallOption) (*fsrpc.ReadChunkReply, error) {
+	/*var wg sync.WaitGroup
 
-	// read every chunk of the file
-	var wg sync.WaitGroup
-	data := make([]byte, 0)
-	metaData := make([]byte, 0)
+	// reply map
+	// replyMap := make(map[string] []byte)
+	replyMap := make(map[string]*fsrpc.ReadChunkReply)
 
-	for _, chunk := range masterReply.Chunks {
+	// Concurrent ReadChunk for each in map
+	for name, client := range g.datanodeClientMap {
 		wg.Add(1)
 
 		// start a new goroutine
-		chunk := chunk
+		client := client
+		name := name
 		go func() {
 			// get the whole chunk data
-			dataReply, err := ConcurrentReadChunk(g.ctx, &fsrpc.ReadChunkRequest{
-				Id:      chunk.Id,
-				Offset:  0,
-				Size:    config.FILE_SIZE,
-				Version: chunk.Version,
-			})
-
-			if err != nil || dataReply.Status != fsrpc.Status_OK {
-				print("data chunk mismatch master chunk")
+			reply, err := client.ReadChunk(ctx, in, opts...)
+			if err != nil || reply.Status != fsrpc.Status_OK {
 				defer wg.Done()
 				return
 			}
-			if chunk.HoldsMeta {
-				copy(metaData, dataReply.Data)
-			} else {
-				data = append(data, dataReply.Data...)
-				data = append(data, ","...)
-			}
+			replyMap[name] = reply
 
 			defer wg.Done()
 		}()
@@ -205,136 +170,55 @@ func (f *File) Read() (b []byte, n int64, err error) {
 	// wait for all tasks finish
 	wg.Wait()
 
-	// convert to JSON
-	// DynamicCopy(&b, connect(data, metaData))
-	//src := connect(data, metaData)
-	//for i := 0; i < len(b) && i < len(src); i++ {
-	//	b[i] = src[i]
-	//}
-	//b = append(b, src[len(b):]...)
-	res := connect(data, metaData)
-
-	return res, int64(len(res)), nil
+	for _, data := range replyMap {
+		return data, nil
+	}
+	return nil, errors.New("no data")
+	*/
+	var dc fsrpc.DataNodeClient
+	c.mu.RLock()
+	for _, client := range c.datanodeClientMap {
+		dc = client
+	}
+	c.mu.RUnlock()
+	return dc.ReadChunk(ctx, in, opts...)
 }
 
-/*
-ReadAt
-@para
-	name(string):  the name of the file
-@return
-	fd(uint64): the fd of the open file
-	status(Status)
-	error(error)
-*/
-func (f *File) ReadAt(b []byte, col uint32, row uint32) (n int64, err error) {
-	// read cell to get metadata
-	masterReq := fsrpc.ReadCellRequest{
-		Fd:     f.Fd,
-		Column: col,
-		Row:    row,
-	}
-	masterReply, err := g.masterClient.ReadCell(g.ctx, &masterReq)
+func (c *Client) concurrentWriteChunk(ctx context.Context, in *fsrpc.WriteChunkRequest, opts ...grpc.CallOption) (*fsrpc.WriteChunkReply, error) {
+	/*
+		var wg sync.WaitGroup
+		wg.Add(1)
 
-	if err != nil {
-		return -1, err
-	}
-	if masterReply.Status != fsrpc.Status_OK {
-		// have fd so not found must due to some invalid para
-		return -1, fs.ErrInvalid
-	}
+		// reply map
+		replyMap := make(map[string]*fsrpc.WriteChunkReply)
 
-	// use metadata to read chunk
-	dataReq := fsrpc.ReadChunkRequest{
-		Id:      masterReply.Cell.Chunk.Id,
-		Offset:  masterReply.Cell.Offset,
-		Size:    masterReply.Cell.Size,
-		Version: masterReply.Cell.Chunk.Version,
-	}
-	dataReply, err := ConcurrentReadChunk(g.ctx, &dataReq)
+		// Concurrent ReadChunk for each in map
+		for name, client := range g.datanodeClientMap {
+			// start a new goroutine
+			go func() {
+				// get the whole chunk data
+				reply, err := client.WriteChunk(ctx, in, opts...)
+				if err != nil {
+					return
+				}
+				replyMap[name] = reply
 
-	if err != nil {
-		return -1, err
-	}
-	switch dataReply.Status {
-	case fsrpc.Status_OK:
-		// open correctly
-		// DynamicCopy(&b, dataReply.Data)
-		copy(b, dataReply.Data)
-		// b = append(b, dataReply.Data[len(b):]...)
-		return int64(masterReply.Cell.Size), nil
-	case fsrpc.Status_NotFound:
-		// not found
-		return -1, fs.ErrInvalid
-	default:
-		// should never reach here
-		panic("OpenSheet RPC return illegal Status")
-	}
-}
+				defer wg.Done()
+			}()
+		}
+		// wait for all tasks finish
+		wg.Wait()
 
-/*
-WriteAt
-@para
-	name(string):  the name of the file
-@return
-	fd(uint64): the fd of the open file
-	status(Status)
-	error(error)
-*/
-func (f *File) WriteAt(b []byte, col uint32, row uint32, padding string) (n int64, err error) {
-	// read cell to get metadata
-	masterReq := fsrpc.WriteCellRequest{
-		Fd:     f.Fd,
-		Column: col,
-		Row:    row,
+		for _, data := range replyMap {
+			return data, nil
+		}
+		return nil, errors.New("no data")
+	*/
+	var dc fsrpc.DataNodeClient
+	c.mu.RLock()
+	for _, client := range c.datanodeClientMap {
+		dc = client
 	}
-	masterReply, err := g.masterClient.WriteCell(g.ctx, &masterReq)
-
-	if err != nil {
-		return -1, err
-	}
-
-	// get the correct version
-	var version uint64
-	switch masterReply.Status {
-	case fsrpc.Status_OK:
-		// open correctly
-		version = masterReply.Cell.Chunk.Version
-	case fsrpc.Status_NotFound:
-		// not found
-		version = 0
-	default:
-		// should never reach here
-		panic("WriteCell RPC return illegal Status")
-	}
-
-	// if padding is empty
-	if len(padding) == 0 {
-		padding = " "
-	}
-
-	// use metadata to read chunk
-	dataReq := fsrpc.WriteChunkRequest{
-		Id:      masterReply.Cell.Chunk.Id,
-		Offset:  masterReply.Cell.Offset,
-		Size:    uint64(len(b)),
-		Version: version,
-		Padding: padding,
-		Data:    b,
-	}
-	dataReply, err := ConcurrentWriteChunk(g.ctx, &dataReq)
-
-	if err != nil {
-		return -1, err
-	}
-	switch dataReply.Status {
-	case fsrpc.Status_OK:
-		// open correctly
-		return int64(len(b)), nil
-	case fsrpc.Status_NotFound:
-		// not found
-		return -1, fs.ErrInvalid
-	default:
-		// should never reach here
-		panic("OpenSheet RPC return illegal Status")
-	}
+	c.mu.RUnlock()
+	return dc.WriteChunk(ctx, in, opts...)
 }

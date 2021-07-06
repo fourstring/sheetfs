@@ -14,6 +14,7 @@ import (
 type server struct {
 	fs_rpc.UnimplementedMasterNodeServer
 	fileMgr *filemgr.FileManager
+	alloc   *datanode_alloc.DataNodeAllocator
 	logger  *zap.Logger
 }
 
@@ -31,13 +32,13 @@ from database to create a server.
 	error:
 		errors during auto migration.
 */
-func NewServer(db *gorm.DB) (*server, error) {
+func NewServer(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator) (*server, error) {
 	err := db.AutoMigrate(&filemgr.MapEntry{}, &sheetfile.Chunk{})
 	if err != nil {
 		return nil, err
 	}
 	logger, _ := zap.NewProduction()
-	s := &server{fileMgr: filemgr.LoadFileManager(db), logger: logger}
+	s := &server{fileMgr: filemgr.LoadFileManager(db, alloc), logger: logger, alloc: alloc}
 	return s, nil
 }
 
@@ -70,7 +71,7 @@ func (s *server) defaultErrorHandler(err error, status *fs_rpc.Status) {
 }
 
 func (s *server) RegisterDataNode(ctx context.Context, request *fs_rpc.RegisterDataNodeRequest) (*fs_rpc.RegisterDataNodeReply, error) {
-	datanode_alloc.AddDataNode(request.Addr)
+	s.alloc.AddDataNode(request.Addr)
 	return &fs_rpc.RegisterDataNodeReply{Status: fs_rpc.Status_OK}, nil
 }
 

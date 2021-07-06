@@ -5,6 +5,7 @@ import (
 	"google.golang.org/grpc"
 	"log"
 	"net"
+	"sheetfs/master/datanode_alloc"
 	"sheetfs/master/server"
 	fs_rpc "sheetfs/protocol"
 )
@@ -21,7 +22,7 @@ func main() {
 	if err != nil {
 		log.Fatal(err)
 	}
-	master, err := server.NewServer(db)
+	master, err := server.NewServer(db, datanode_alloc.NewDataNodeAllocator())
 	if err != nil {
 		log.Fatal(err)
 	}

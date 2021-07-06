@@ -19,8 +19,9 @@ func newTestServer() (*server, error) {
 	if err != nil {
 		return nil, err
 	}
-	datanode_alloc.AddDataNode("node1")
-	s, err := NewServer(db)
+	alloc := datanode_alloc.NewDataNodeAllocator()
+	alloc.AddDataNode("node1")
+	s, err := NewServer(db, alloc)
 	if err != nil {
 		return nil, err
 	}
@@ -65,14 +66,15 @@ func TestServer_RegisterDataNode(t *testing.T) {
 	Convey("Build test server", t, func() {
 		db, err := tests.GetTestDB()
 		So(err, ShouldBeNil)
-		s, err := NewServer(db)
+		alloc := datanode_alloc.NewDataNodeAllocator()
+		s, err := NewServer(db, alloc)
 		So(err, ShouldBeNil)
 		Convey("Call rpc method", func() {
 			rep, err := s.RegisterDataNode(ctx, &fs_rpc.RegisterDataNodeRequest{Addr: "node1"})
 			So(err, ShouldBeNil)
 			So(rep.Status, ShouldEqual, fs_rpc.Status_OK)
 			Convey("Allocate data nodes", func() {
-				node, err := datanode_alloc.AllocateNode()
+				node, err := alloc.AllocateNode()
 				So(err, ShouldBeNil)
 				So(node, ShouldEqual, "node1")
 			})

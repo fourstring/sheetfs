@@ -10,21 +10,23 @@ import (
 
 func TestDataNodeAllocation(t *testing.T) {
 	Convey("Test for allocate directly", t, func() {
-		_, err := AllocateNode()
+		alloc := NewDataNodeAllocator()
+		_, err := alloc.AllocateNode()
 		So(err, ShouldBeError, &errors.NoDataNodeError{})
 	})
 
 	Convey("Add some nodes", t, func() {
-		AddDataNode("1")
-		AddDataNode("2")
-		AddDataNode("3")
+		alloc := NewDataNodeAllocator()
+		alloc.AddDataNode("1")
+		alloc.AddDataNode("2")
+		alloc.AddDataNode("3")
 		Convey("Test round rubin allocation", func() {
-			node, err := AllocateNode()
+			node, err := alloc.AllocateNode()
 			So(err, ShouldBeNil)
 			So(node, ShouldEqual, "3")
-			node, err = AllocateNode()
+			node, err = alloc.AllocateNode()
 			So(node, ShouldEqual, "1")
-			node, err = AllocateNode()
+			node, err = alloc.AllocateNode()
 			So(node, ShouldEqual, "2")
 		})
 	})
@@ -32,9 +34,10 @@ func TestDataNodeAllocation(t *testing.T) {
 
 func TestConcurrentAllocation(t *testing.T) {
 	Convey("Add some nodes", t, func() {
+		alloc := NewDataNodeAllocator()
 		nodesCount := 20
 		for i := 0; i < nodesCount; i++ {
-			AddDataNode(fmt.Sprintf("%d", i))
+			alloc.AddDataNode(fmt.Sprintf("%d", i))
 		}
 		Convey("Test concurrent allocation", func(c C) {
 			var wg sync.WaitGroup
@@ -42,7 +45,7 @@ func TestConcurrentAllocation(t *testing.T) {
 			var mu sync.Mutex
 			doWork := func() {
 				defer wg.Done()
-				node, err := AllocateNode()
+				node, err := alloc.AllocateNode()
 				c.So(err, ShouldBeNil)
 				mu.Lock()
 				defer mu.Unlock()

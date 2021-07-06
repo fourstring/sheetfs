@@ -90,7 +90,7 @@ func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 	}
 
 	curVersion := utils.GetVersion(file)
-	print("current version: ", curVersion, ", request version: ", request.Version)
+	// print("current version: ", curVersion, ", request version: ", request.Version)
 	if curVersion+1 == request.Version {
 		// can update
 		// write the data

@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 	"text/template"
-) //
+)
 
 func TestSheetFile_DynamicPersistent(t *testing.T) {
 	Convey("Create test database", t, func() {
@@ -115,22 +115,23 @@ func TestCreateSheetFile(t *testing.T) {
 	Convey("Get test db", t, func() {
 		db, err := tests.GetTestDB(&Chunk{})
 		So(err, ShouldBeNil)
+		alloc := datanode_alloc.NewDataNodeAllocator()
 		Convey("Create sheetfile when no datanode registered", func() {
-			_, err := CreateSheetFile(db, "errfile")
+			_, err := CreateSheetFile(db, alloc, "errfile")
 			So(err, ShouldBeError, &errors.NoDataNodeError{})
 		})
 		Convey("Add a datanode", func() {
-			datanode_alloc.AddDataNode("node1")
+			alloc.AddDataNode("node1")
 			backup_create_tmpl := create_tmpl
 			Convey("Create SheetFile using ill-formed SQL", func() {
 				create_tmpl, err = template.New("ill-formed SQL").Parse("ill-formed SQL {{ .Name}}")
 				So(err, ShouldBeNil)
-				_, err = CreateSheetFile(db, "ill-file")
+				_, err = CreateSheetFile(db, alloc, "ill-file")
 				So(err, ShouldBeError)
 			})
 			create_tmpl = backup_create_tmpl
 			Convey("Create sheetfile and verify invariants", func() {
-				file, err := CreateSheetFile(db, "sheet0")
+				file, err := CreateSheetFile(db, alloc, "sheet0")
 				So(err, ShouldBeNil)
 				So(len(file.Cells), ShouldEqual, 1)
 				So(len(file.Chunks), ShouldEqual, 1)
@@ -158,8 +159,9 @@ func TestSheetFile_GetCellChunk(t *testing.T) {
 	Convey("Create test file and datanode", t, func() {
 		db, err := tests.GetTestDB(&Chunk{})
 		So(err, ShouldBeNil)
-		datanode_alloc.AddDataNode("node1")
-		file, err := CreateSheetFile(db, "sheet0")
+		alloc := datanode_alloc.NewDataNodeAllocator()
+		alloc.AddDataNode("node1")
+		file, err := CreateSheetFile(db, alloc, "sheet0")
 		So(err, ShouldBeNil)
 		Convey("Get non-exist cell", func() {
 			cell, chunk, err := file.GetCellChunk(0, 0)
@@ -181,8 +183,9 @@ func TestSheetFile_WriteCellChunk_GetAllChunks(t *testing.T) {
 	Convey("Create test file and datanode", t, func() {
 		db, err := tests.GetTestDB(&Chunk{})
 		So(err, ShouldBeNil)
-		datanode_alloc.AddDataNode("node1")
-		file, err := CreateSheetFile(db, "sheet0")
+		alloc := datanode_alloc.NewDataNodeAllocator()
+		alloc.AddDataNode("node1")
+		file, err := CreateSheetFile(db, alloc, "sheet0")
 		So(err, ShouldBeNil)
 		Convey("Write to MetaCell", func() {
 			cell, chunk, err := file.WriteCellChunk(config.SheetMetaCellRow, config.SheetMetaCellCol, db)
@@ -242,8 +245,9 @@ func TestLoadSheetFile(t *testing.T) {
 	Convey("Create and persist test file", t, func() {
 		db, err := tests.GetTestDB(&Chunk{})
 		So(err, ShouldBeNil)
-		datanode_alloc.AddDataNode("node1")
-		file, err := CreateSheetFile(db, "sheet0")
+		alloc := datanode_alloc.NewDataNodeAllocator()
+		alloc.AddDataNode("node1")
+		file, err := CreateSheetFile(db, alloc, "sheet0")
 		So(err, ShouldBeNil)
 		for i := uint32(0); i < 10; i++ {
 			_, _, err := file.WriteCellChunk(i, i, db)
@@ -251,7 +255,7 @@ func TestLoadSheetFile(t *testing.T) {
 		}
 		err = file.Persistent(db)
 		So(err, ShouldBeNil)
-		file = LoadSheetFile(db, "sheet0")
+		file = LoadSheetFile(db, alloc, "sheet0")
 		// 10 normal cell and 1 MetaCell
 		So(len(file.Cells), ShouldEqual, 11)
 		So(len(file.Chunks), ShouldEqual, 4)
@@ -282,8 +286,9 @@ func TestSheetFile_Concurrency1(t *testing.T) {
 	Convey("Create test file", t, func() {
 		db, err := tests.GetTestDB(&Chunk{})
 		So(err, ShouldBeNil)
-		datanode_alloc.AddDataNode("node1")
-		file, err := CreateSheetFile(db, "sheet0")
+		alloc := datanode_alloc.NewDataNodeAllocator()
+		alloc.AddDataNode("node1")
+		file, err := CreateSheetFile(db, alloc, "sheet0")
 		Convey("Write to cells concurrently", func(c C) {
 			// record expected Version after operation
 			expectedVersions := map[uint64]*uint64{}
@@ -323,8 +328,9 @@ func TestSheetFile_Concurrency2(t *testing.T) {
 	Convey("Create test file", t, func() {
 		db, err := tests.GetTestDB(&Chunk{})
 		So(err, ShouldBeNil)
-		datanode_alloc.AddDataNode("node1")
-		file, err := CreateSheetFile(db, "sheet0")
+		alloc := datanode_alloc.NewDataNodeAllocator()
+		alloc.AddDataNode("node1")
+		file, err := CreateSheetFile(db, alloc, "sheet0")
 		Convey("Read and write concurrently", func(c C) {
 			// record expected Version after operation
 			expectedVersions := map[uint64]*uint64{}
