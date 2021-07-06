@@ -23,7 +23,7 @@ func TestDatanode(t *testing.T) {
 	testString := "this is the test data"
 	data := []byte(testString)
 	size := len(testString)
-	req := fsrpc.WriteChunkRequest{Id: 1, Data: data, Size: uint64(size), Padding: " ", Version: 0}
+	req := fsrpc.WriteChunkRequest{Id: 1, Data: data, Size: uint64(size), Padding: " ", Version: 1}
 	res, _ := s.WriteChunk(context.Background(), &req)
 	if res.Status != fsrpc.Status_OK {
 		t.Error("wrong")
@@ -51,7 +51,7 @@ func TestDatanode(t *testing.T) {
 	testString = "this is the new test data"
 	data = []byte(testString)
 	size = len(testString)
-	req = fsrpc.WriteChunkRequest{Id: 1, Data: data, Size: uint64(size), Padding: " ", Version: 1}
+	req = fsrpc.WriteChunkRequest{Id: 1, Data: data, Size: uint64(size), Padding: " ", Version: 2}
 	_, _ = s.WriteChunk(context.Background(), &req)
 
 	readReq = fsrpc.ReadChunkRequest{Id: 1, Size: 25, Version: 2}
@@ -64,10 +64,10 @@ func TestDatanode(t *testing.T) {
 	testString = "second test data"
 	data = []byte(testString)
 	size = len(testString)
-	req = fsrpc.WriteChunkRequest{Id: 1, Data: data, Size: uint64(size), Padding: " ", Version: 2}
+	req = fsrpc.WriteChunkRequest{Id: 1, Data: data, Size: uint64(size), Padding: " ", Version: 3}
 	_, _ = s.WriteChunk(context.Background(), &req)
 
-	readReq = fsrpc.ReadChunkRequest{Id: 1, Size: 25, Version: 3}
+	readReq = fsrpc.ReadChunkRequest{Id: 1, Size: 16, Version: 3}
 	readRes, _ = s.ReadChunk(context.Background(), &readReq)
 	if string(readRes.Data) != "second test data" {
 		fmt.Printf("%s", string(readRes.Data))
