@@ -3,7 +3,7 @@ package tests
 import (
 	stdctx "context"
 	"fmt"
-	"github.com/fourstring/sheetfs/client"
+	"github.com/fourstring/sheetfs/fsclient"
 	. "github.com/smartystreets/goconvey/convey"
 	"sync"
 	"testing"
@@ -26,7 +26,7 @@ func constructData(col uint32, row uint32) []byte {
 
 func TestCreate(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := client.NewClient(masterAddr)
+		c, err := fsclient.NewClient(masterAddr)
 		So(err, ShouldBeNil)
 		Convey("Create test file", func() {
 			_, err := c.Create(ctx, "test file")
@@ -37,7 +37,7 @@ func TestCreate(t *testing.T) {
 
 func TestOpen(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := client.NewClient(masterAddr)
+		c, err := fsclient.NewClient(masterAddr)
 		So(err, ShouldBeNil)
 		Convey("Open exist test file", func() {
 			c.Create(ctx, "test file")
@@ -55,7 +55,7 @@ func TestOpen(t *testing.T) {
 
 func TestDelete(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		_, err := client.NewClient(masterAddr)
+		_, err := fsclient.NewClient(masterAddr)
 		So(err, ShouldBeNil)
 		Convey("Delete test file", func() {
 			// TODO
@@ -69,7 +69,7 @@ func TestDelete(t *testing.T) {
 
 func TestReadAndWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := client.NewClient(masterAddr)
+		c, err := fsclient.NewClient(masterAddr)
 		So(err, ShouldBeNil)
 
 		// var file File
@@ -98,7 +98,7 @@ func TestReadAndWrite(t *testing.T) {
 
 func TestComplicatedReadAndWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := client.NewClient(masterAddr)
+		c, err := fsclient.NewClient(masterAddr)
 		So(err, ShouldBeNil)
 
 		// var file File
@@ -122,7 +122,7 @@ func TestComplicatedReadAndWrite(t *testing.T) {
 
 func TestConcurrentWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := client.NewClient(masterAddr)
+		c, err := fsclient.NewClient(masterAddr)
 		So(err, ShouldBeNil)
 
 		// var file File

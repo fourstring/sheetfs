@@ -1,4 +1,4 @@
-package client
+package fsclient
 
 func connect(data []byte, metadata []byte) []byte {
 	totalData := []byte("{\"celldata\": [") //header
