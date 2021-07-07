@@ -3,6 +3,7 @@ package main
 import (
 	"context"
 	"flag"
+	"fmt"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -10,13 +11,14 @@ import (
 	fsrpc "sheetfs/protocol"
 )
 
-var address = flag.String("a", "", "address to which the datanode listens")
+var port = flag.Uint("p", 0, "port to listen on")
+var forClientAddress = flag.String("a", "", "address to which the datanode listens")
 var masterAddr = flag.String("m", "", "address of master node")
 var dataPath = flag.String("d", "", "path of data files")
 
 func main() {
 	flag.Parse()
-	lis, err := net.Listen("tcp", *address)
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
 		log.Fatalf("net.Listen err: %v", err)
 	}
@@ -29,7 +31,7 @@ func main() {
 		log.Fatalf("%s", err)
 	}
 	masterClient := fsrpc.NewMasterNodeClient(conn)
-	rep, err := masterClient.RegisterDataNode(context.Background(), &fsrpc.RegisterDataNodeRequest{Addr: *address})
+	rep, err := masterClient.RegisterDataNode(context.Background(), &fsrpc.RegisterDataNodeRequest{Addr: *forClientAddress})
 	if err != nil {
 		log.Fatalf("%s", err)
 	}

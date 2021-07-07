@@ -1,0 +1,52 @@
+version: "3"
+
+services:
+  master:
+    build:
+      dockerfile: "./master.Dockerfile"
+      context: "."
+    ports:
+      - 8432:8432
+    environment:
+      MASTER_ADDR: "master:8432"
+    networks:
+      - sheetfs
+  datanode1:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9375:9375
+    environment:
+      MASTER_ADDR: "master:8432"
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9375"
+      DATANODE_PORT: "9375"
+    networks:
+      - sheetfs
+  datanode2:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9376:9375
+    environment:
+      MASTER_ADDR: "master:8432"
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9376"
+      DATANODE_PORT: "9375"
+    networks:
+      - sheetfs
+  datanode3:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9377:9375
+    environment:
+      MASTER_ADDR: "master:8432"
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9377"
+      DATANODE_PORT: "9375"
+    networks:
+      - sheetfs
+
+networks:
+  sheetfs:

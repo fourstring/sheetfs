@@ -364,10 +364,10 @@ func TestComplicatedReadAndWrite(t *testing.T) {
 			So(err, ShouldBeNil)
 			file.Read(ctx) // must call this before write
 			// read := make([]byte, 1024)
-			for col := 0; col < 10; col++ {
-				for row := 0; row < 10; row++ {
-					b := constructData(uint32(col), uint32(row))
-					file.WriteAt(ctx, b, uint32(col), uint32(row), " ")
+			for row := 0; row < 10; row++ {
+				for col := 0; col < 10; col++ {
+					b := constructData(uint32(row), uint32(col))
+					file.WriteAt(ctx, b, uint32(row), uint32(col), " ")
 				}
 			}
 			_, size, err := file.Read(ctx) // must call this before write
@@ -401,14 +401,14 @@ func TestConcurrentWrite(t *testing.T) {
 
 			// read := make([]byte, 1024)
 			var wg sync.WaitGroup
-			for col := 0; col < 10; col++ {
-				for row := 0; row < 10; row++ {
+			for row := 0; row < 10; row++ {
+				for col := 0; col < 10; col++ {
 					row := row
 					col := col
 					wg.Add(1)
 					go func() {
-						b := constructData(uint32(col), uint32(row))
-						file.WriteAt(ctx, b, uint32(col), uint32(row), " ")
+						b := constructData(uint32(row), uint32(col))
+						file.WriteAt(ctx, b, uint32(row), uint32(col), " ")
 						wg.Done()
 					}()
 				}

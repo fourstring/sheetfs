@@ -152,7 +152,9 @@ which is not actually written to DataNode by another client. If so, this functio
 spin until it success or cancelled by ctx, so ctx is generally necessary.
 
 @para
-	name(string):  the name of the file
+	ctx: context.Context used to cancel operation
+	b: buffer for reading cell
+	row, col
 @return
 	fd(uint64): the fd of the open file
 	status(Status)
@@ -162,12 +164,12 @@ spin until it success or cancelled by ctx, so ctx is generally necessary.
 		*CancelledError: If operations(spin or rpc call) are cancelled by ctx. And only if there is no
 		other errors happened and ctx cancelled, a CancelledError will be returned.
 */
-func (f *File) ReadAt(ctx context.Context, b []byte, col uint32, row uint32) (n int64, err error) {
+func (f *File) ReadAt(ctx context.Context, b []byte, row uint32, col uint32) (n int64, err error) {
 	// read cell to get metadata
 	masterReq := fsrpc.ReadCellRequest{
 		Fd:     f.fd,
-		Column: col,
 		Row:    row,
+		Column: col,
 	}
 	masterReply, err := f.client.masterClient.ReadCell(ctx, &masterReq)
 
@@ -225,7 +227,12 @@ which is not actually written to DataNode by another client. If so, this functio
 spin until it success or cancelled by ctx, so ctx is generally necessary.
 
 @para
-	name(string):  the name of the file
+	@para
+	ctx: context.Context used to cancel operation
+	b: buffer for reading cell
+	padding: padding character used to pad a cell to its maximum size, for LuckySheet file,
+	a " " should be passed in.
+	row, col
 @return
 	fd(uint64): the fd of the open file
 	status(Status)
@@ -235,12 +242,12 @@ spin until it success or cancelled by ctx, so ctx is generally necessary.
 		*CancelledError: If operations(spin or rpc call) are cancelled by ctx. And only if there is no
 		other errors happened and ctx cancelled, a CancelledError will be returned.
 */
-func (f *File) WriteAt(ctx context.Context, b []byte, col uint32, row uint32, padding string) (n int64, err error) {
+func (f *File) WriteAt(ctx context.Context, b []byte, row uint32, col uint32, padding string) (n int64, err error) {
 	// read cell to get metadata
 	masterReq := fsrpc.WriteCellRequest{
 		Fd:     f.fd,
-		Column: col,
 		Row:    row,
+		Column: col,
 	}
 	masterReply, err := f.client.masterClient.WriteCell(ctx, &masterReq)
 
