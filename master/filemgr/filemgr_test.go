@@ -2,12 +2,12 @@ package filemgr
 
 import (
 	"fmt"
+	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	"github.com/fourstring/sheetfs/master/errors"
+	"github.com/fourstring/sheetfs/master/sheetfile"
+	"github.com/fourstring/sheetfs/tests"
 	. "github.com/smartystreets/goconvey/convey"
 	"gorm.io/gorm"
-	"sheetfs/master/datanode_alloc"
-	"sheetfs/master/errors"
-	"sheetfs/master/sheetfile"
-	"sheetfs/tests"
 	"sort"
 	"testing"
 )

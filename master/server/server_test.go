@@ -3,11 +3,11 @@ package server
 import (
 	goctx "context"
 	"fmt"
+	"github.com/fourstring/sheetfs/master/config"
+	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	fs_rpc "github.com/fourstring/sheetfs/protocol"
+	"github.com/fourstring/sheetfs/tests"
 	. "github.com/smartystreets/goconvey/convey"
-	"sheetfs/master/config"
-	"sheetfs/master/datanode_alloc"
-	fs_rpc "sheetfs/protocol"
-	"sheetfs/tests"
 	"sort"
 	"testing"
 )

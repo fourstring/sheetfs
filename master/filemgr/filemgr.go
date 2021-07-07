@@ -1,11 +1,11 @@
 package filemgr
 
 import (
+	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	"github.com/fourstring/sheetfs/master/errors"
+	"github.com/fourstring/sheetfs/master/sheetfile"
+	fs_rpc "github.com/fourstring/sheetfs/protocol"
 	"gorm.io/gorm"
-	"sheetfs/master/datanode_alloc"
-	"sheetfs/master/errors"
-	"sheetfs/master/sheetfile"
-	fs_rpc "sheetfs/protocol"
 	"sync"
 	"time"
 )

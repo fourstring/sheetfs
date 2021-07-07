@@ -3,8 +3,8 @@ package tests
 import (
 	stdctx "context"
 	"fmt"
+	"github.com/fourstring/sheetfs/client"
 	. "github.com/smartystreets/goconvey/convey"
-	"sheetfs/client"
 	"sync"
 	"testing"
 )

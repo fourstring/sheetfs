@@ -2,9 +2,9 @@ package utils
 
 import (
 	"encoding/binary"
+	"github.com/fourstring/sheetfs/config"
+	"github.com/fourstring/sheetfs/datanode/buffmgr"
 	"os"
-	"sheetfs/config"
-	"sheetfs/datanode/buffmgr"
 )
 
 /* private functions */

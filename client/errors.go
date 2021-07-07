@@ -2,7 +2,7 @@ package client
 
 import (
 	"fmt"
-	fsrpc "sheetfs/protocol"
+	fsrpc "github.com/fourstring/sheetfs/protocol"
 )
 
 type CancelledError struct {

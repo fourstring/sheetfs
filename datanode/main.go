@@ -4,11 +4,11 @@ import (
 	"context"
 	"flag"
 	"fmt"
+	"github.com/fourstring/sheetfs/datanode/server"
+	fsrpc "github.com/fourstring/sheetfs/protocol"
 	"google.golang.org/grpc"
 	"log"
 	"net"
-	"sheetfs/datanode/server"
-	fsrpc "sheetfs/protocol"
 )
 
 var port = flag.Uint("p", 0, "port to listen on")

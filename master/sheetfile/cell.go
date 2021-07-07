@@ -2,8 +2,8 @@ package sheetfile
 
 import (
 	"fmt"
+	"github.com/fourstring/sheetfs/master/config"
 	"gorm.io/gorm"
-	"sheetfs/master/config"
 	"strings"
 	"text/template"
 )

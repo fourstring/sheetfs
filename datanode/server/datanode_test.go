@@ -3,11 +3,11 @@ package server
 import (
 	"context"
 	"fmt"
+	"github.com/fourstring/sheetfs/config"
+	fsrpc "github.com/fourstring/sheetfs/protocol"
 	"io/ioutil"
 	"os"
 	"path"
-	"sheetfs/config"
-	fsrpc "sheetfs/protocol"
 	"testing"
 )
 

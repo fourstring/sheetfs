@@ -2,12 +2,12 @@ package main
 
 import (
 	"flag"
+	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	"github.com/fourstring/sheetfs/master/server"
+	fs_rpc "github.com/fourstring/sheetfs/protocol"
 	"google.golang.org/grpc"
 	"log"
 	"net"
-	"sheetfs/master/datanode_alloc"
-	"sheetfs/master/server"
-	fs_rpc "sheetfs/protocol"
 )
 
 var address = flag.String("a", "", "address to which the master listens")

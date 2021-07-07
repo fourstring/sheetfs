@@ -1,7 +1,7 @@
 package datanode_alloc
 
 import (
-	"sheetfs/master/errors"
+	"github.com/fourstring/sheetfs/master/errors"
 	"sync"
 )
 

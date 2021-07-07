@@ -1,4 +1,4 @@
-module sheetfs
+module github.com/fourstring/sheetfs
 
 go 1.16
 

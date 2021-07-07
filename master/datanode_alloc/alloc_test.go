@@ -2,8 +2,8 @@ package datanode_alloc
 
 import (
 	"fmt"
+	"github.com/fourstring/sheetfs/master/errors"
 	. "github.com/smartystreets/goconvey/convey"
-	"sheetfs/master/errors"
 	"sync"
 	"testing"
 )

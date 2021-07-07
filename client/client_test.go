@@ -3,6 +3,11 @@ package client
 import (
 	stdctx "context"
 	"fmt"
+	datanodeServer "github.com/fourstring/sheetfs/datanode/server"
+	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	masternodeServer "github.com/fourstring/sheetfs/master/server"
+	fs_rpc "github.com/fourstring/sheetfs/protocol"
+	"github.com/fourstring/sheetfs/tests"
 	. "github.com/smartystreets/goconvey/convey"
 	"google.golang.org/grpc"
 	"io/ioutil"
@@ -10,11 +15,6 @@ import (
 	"net"
 	"os"
 	"path"
-	datanodeServer "sheetfs/datanode/server"
-	"sheetfs/master/datanode_alloc"
-	masternodeServer "sheetfs/master/server"
-	fs_rpc "sheetfs/protocol"
-	"sheetfs/tests"
 	"sync"
 	"testing"
 )

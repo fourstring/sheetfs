@@ -1,10 +1,10 @@
 package sheetfile
 
 import (
+	"github.com/fourstring/sheetfs/master/config"
+	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	"github.com/fourstring/sheetfs/master/errors"
 	"gorm.io/gorm"
-	"sheetfs/master/config"
-	"sheetfs/master/datanode_alloc"
-	"sheetfs/master/errors"
 	"sync"
 )
 

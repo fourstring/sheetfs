@@ -1,10 +1,10 @@
 package sheetfile
 
 import (
+	"github.com/fourstring/sheetfs/master/config"
+	"github.com/fourstring/sheetfs/master/model"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"sheetfs/master/config"
-	"sheetfs/master/model"
 )
 
 /*

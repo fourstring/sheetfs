@@ -2,10 +2,10 @@ package client
 
 import (
 	"context"
+	fsrpc "github.com/fourstring/sheetfs/protocol"
 	"google.golang.org/grpc"
 	"io/fs"
 	"log"
-	fsrpc "sheetfs/protocol"
 	"strings"
 	"sync"
 )

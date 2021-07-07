@@ -3,9 +3,9 @@ package client
 import (
 	"context"
 	"fmt"
+	"github.com/fourstring/sheetfs/config"
+	fsrpc "github.com/fourstring/sheetfs/protocol"
 	"io/fs"
-	"sheetfs/config"
-	fsrpc "sheetfs/protocol"
 	"sync"
 )
 

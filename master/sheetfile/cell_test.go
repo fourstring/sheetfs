@@ -2,10 +2,10 @@ package sheetfile
 
 import (
 	"fmt"
+	"github.com/fourstring/sheetfs/master/config"
+	"github.com/fourstring/sheetfs/tests"
 	. "github.com/smartystreets/goconvey/convey"
 	"math"
-	"sheetfs/master/config"
-	"sheetfs/tests"
 	"testing"
 )
 

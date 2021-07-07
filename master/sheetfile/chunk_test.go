@@ -2,9 +2,9 @@ package sheetfile
 
 import (
 	"fmt"
+	"github.com/fourstring/sheetfs/master/config"
+	"github.com/fourstring/sheetfs/tests"
 	. "github.com/smartystreets/goconvey/convey"
-	"sheetfs/master/config"
-	"sheetfs/tests"
 	"testing"
 )
 

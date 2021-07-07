@@ -2,11 +2,11 @@ package sheetfile
 
 import (
 	ctx "context"
+	"github.com/fourstring/sheetfs/master/config"
+	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	"github.com/fourstring/sheetfs/master/errors"
+	"github.com/fourstring/sheetfs/tests"
 	. "github.com/smartystreets/goconvey/convey"
-	"sheetfs/master/config"
-	"sheetfs/master/datanode_alloc"
-	"sheetfs/master/errors"
-	"sheetfs/tests"
 	"sync"
 	"sync/atomic"
 	"testing"
