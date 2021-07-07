@@ -10,17 +10,18 @@ import (
 	"net"
 	"os"
 	"path"
-	"sheetfs/config"
-	datanode "sheetfs/datanode/server"
+	datanodeServer "sheetfs/datanode/server"
 	"sheetfs/master/datanode_alloc"
-	masternode "sheetfs/master/server"
+	masternodeServer "sheetfs/master/server"
 	fs_rpc "sheetfs/protocol"
 	"sheetfs/tests"
+	"sync"
 	"testing"
 )
 
 var maxRetry = 10
 var ctx = stdctx.Background()
+var dataNodesNumber = 3
 
 func constructData(col uint32, row uint32) []byte {
 	return []byte("{\n" +
@@ -34,18 +35,56 @@ func constructData(col uint32, row uint32) []byte {
 		"}")
 }
 
+type datanode struct {
+	addr string
+	srv  *grpc.Server
+}
+
+func newDatanode(addr string, srv *grpc.Server) *datanode {
+	return &datanode{addr: addr, srv: srv}
+}
+
 type servers struct {
-	MasterAddr, DataNodeAddr string
-	masterSrv, datanodeSrv   *grpc.Server
+	MasterAddr string
+	masterSrv  *grpc.Server
+	DataNodes  []*datanode
 }
 
 /*
-Start a MasterNode and a DataNode for testing. The db used by MasterNode is sqlite
+prepareDataDir
+When a DataNode is bootstrapped, it needs a clean directory to store chunks.
+This function first check whether dataDirPath exists or not, if not, try to
+create it, or just remove all files under this directory.
+*/
+func prepareDataDir(dataDirPath string) error {
+	_, err := os.Stat(dataDirPath)
+	if err != nil {
+		if os.IsNotExist(err) {
+			err := os.Mkdir(dataDirPath, 0700)
+			return err
+		}
+		return err
+	}
+	dir, err := ioutil.ReadDir(dataDirPath)
+	if err != nil {
+		return err
+	}
+	for _, d := range dir {
+		err = os.RemoveAll(path.Join([]string{dataDirPath, d.Name()}...))
+		if err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+/*
+Start a MasterNode and some DataNodes for testing. The db used by MasterNode is sqlite
 per-connection independent in-memory one, and all chunks on disk will be removed in
 advance. So a fresh MasterNode and DataNode are booted every time to avoid coupling
 between tests.
 
-Both of nodes are working on their separate goroutines, listening on different ports.
+All of nodes are working on their separate goroutines, listening on different ports.
 This implies that they are at the same address space with testing routine, not running
 as standalone processes.
 
@@ -53,6 +92,9 @@ To avoid running out of local ports, caller should remember to stop nodes create
 this function unconditionally, which is implemented by stopNodes. For the purpose of
 stopping, this function will set global variable masterSrv and datanodeSrv, and stopNodes
 calls their Stop() method(if not nil).
+
+@para
+	dataNodeCnt: number of DataNodes to be booted up
 
 @return
 	string: address of MasterNode, can be used to connect to master
@@ -63,10 +105,12 @@ calls their Stop() method(if not nil).
 		returned.
 		* errors while connecting or migrating sqlite tables for initializing MasterNode
 */
-func startNodes() (*servers, error) {
+func startNodes(dataNodeCnt int) (*servers, error) {
 	masterAddr := ""
 	datanodeAddr := ""
-	s := &servers{}
+	s := &servers{
+		DataNodes: []*datanode{},
+	}
 	// retry for at most maxRetry times to search for a usable port
 	for i := 0; i < maxRetry; i++ {
 		// generate
@@ -85,7 +129,7 @@ func startNodes() (*servers, error) {
 			return s, err
 		}
 		alloc := datanode_alloc.NewDataNodeAllocator()
-		ms, err := masternode.NewServer(db, alloc)
+		ms, err := masternodeServer.NewServer(db, alloc)
 		if err != nil {
 			return s, err
 		}
@@ -101,32 +145,38 @@ func startNodes() (*servers, error) {
 		break
 	}
 
-	for i := 0; i < maxRetry; i++ {
-		datanodePort := tests.RandInt(40000, 50000)
-		datanodeAddr = fmt.Sprintf("127.0.0.1:%d", datanodePort)
-		lis, err := net.Listen("tcp", datanodeAddr)
-		if err != nil {
-			if i == maxRetry-1 {
+	for i := 0; i < dataNodeCnt; i++ {
+		for j := 0; j < maxRetry; j++ {
+			datanodePort := tests.RandInt(40000, 50000)
+			datanodeAddr = fmt.Sprintf("127.0.0.1:%d", datanodePort)
+			lis, err := net.Listen("tcp", datanodeAddr)
+			if err != nil {
+				if j == maxRetry-1 {
+					return s, err
+				}
+				continue
+			}
+			// delete all the files first for a fresh DataNode
+			// chunks of DataNodes should be stored in different directories
+			chunksDirPath := fmt.Sprintf("./data/node%d", i)
+			err = prepareDataDir(chunksDirPath)
+			if err != nil {
 				return s, err
 			}
-			continue
+			ds := datanodeServer.NewServer(chunksDirPath)
+			dn := newDatanode(datanodeAddr, grpc.NewServer())
+			fs_rpc.RegisterDataNodeServer(dn.srv, ds)
+			s.DataNodes = append(s.DataNodes, dn)
+			go func() {
+				if err := dn.srv.Serve(lis); err != nil {
+					log.Fatal(err)
+				}
+			}()
+			break
 		}
-		// delete all the files first for a fresh DataNode
-		dir, _ := ioutil.ReadDir(config.FILE_LOCATION)
-		for _, d := range dir {
-			os.RemoveAll(path.Join([]string{config.FILE_LOCATION, d.Name()}...))
-		}
-		ds := datanode.NewServer()
-		s.datanodeSrv = grpc.NewServer()
-		fs_rpc.RegisterDataNodeServer(s.datanodeSrv, ds)
-		go func() {
-			if err := s.datanodeSrv.Serve(lis); err != nil {
-				log.Fatal(err)
-			}
-		}()
-		break
 	}
-	s.MasterAddr, s.DataNodeAddr = masterAddr, datanodeAddr
+
+	s.MasterAddr = masterAddr
 	return s, nil
 }
 
@@ -149,12 +199,17 @@ func (s *servers) registerDataNode() fs_rpc.Status {
 	}
 	defer conn.Close()
 	mc := fs_rpc.NewMasterNodeClient(conn)
-	rep, err := mc.RegisterDataNode(stdctx.Background(), &fs_rpc.RegisterDataNodeRequest{Addr: s.DataNodeAddr})
-	if err != nil {
-		fmt.Printf("%s", err)
-		return fs_rpc.Status_Unavailable
+	for _, node := range s.DataNodes {
+		rep, err := mc.RegisterDataNode(stdctx.Background(), &fs_rpc.RegisterDataNodeRequest{Addr: node.addr})
+		if err != nil {
+			fmt.Printf("%s", err)
+			return fs_rpc.Status_Unavailable
+		}
+		if rep.Status != fs_rpc.Status_OK {
+			return rep.Status
+		}
 	}
-	return rep.Status
+	return fs_rpc.Status_OK
 }
 
 /*
@@ -168,16 +223,15 @@ func (s *servers) stopNodes() {
 	if s.masterSrv != nil {
 		s.masterSrv.Stop()
 	}
-	if s.datanodeSrv != nil {
-		s.datanodeSrv.Stop()
+	for _, node := range s.DataNodes {
+		node.srv.Stop()
 	}
-
 }
 
 func TestCreate(t *testing.T) {
 	Convey("Start test servers", t, func() {
 		// Booting up testing nodes
-		s, err := startNodes()
+		s, err := startNodes(dataNodesNumber)
 		So(err, ShouldBeNil)
 		// register DataNode created to MasterNode
 		status := s.registerDataNode()
@@ -200,7 +254,7 @@ func TestCreate(t *testing.T) {
 func TestOpen(t *testing.T) {
 	Convey("Start test servers", t, func() {
 		// Booting up testing nodes
-		s, err := startNodes()
+		s, err := startNodes(dataNodesNumber)
 		So(err, ShouldBeNil)
 		// register DataNode created to MasterNode
 		status := s.registerDataNode()
@@ -230,7 +284,7 @@ func TestOpen(t *testing.T) {
 func TestDelete(t *testing.T) {
 	Convey("Start test servers", t, func() {
 		// Booting up testing nodes
-		s, err := startNodes()
+		s, err := startNodes(dataNodesNumber)
 		So(err, ShouldBeNil)
 		// register DataNode created to MasterNode
 		status := s.registerDataNode()
@@ -255,7 +309,7 @@ func TestDelete(t *testing.T) {
 func TestReadAndWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
 		// Booting up testing nodes
-		s, err := startNodes()
+		s, err := startNodes(dataNodesNumber)
 		So(err, ShouldBeNil)
 		// register DataNode created to MasterNode
 		status := s.registerDataNode()
@@ -272,7 +326,6 @@ func TestReadAndWrite(t *testing.T) {
 
 			header := []byte("{\"celldata\": []}")
 			So(read[:len(header)], ShouldResemble, header)
-			So(err, ShouldBeNil)
 
 			// read := make([]byte, 1024)
 			b := []byte("this is test")
@@ -296,7 +349,7 @@ func TestReadAndWrite(t *testing.T) {
 func TestComplicatedReadAndWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
 		// Booting up testing nodes
-		s, err := startNodes()
+		s, err := startNodes(dataNodesNumber)
 		So(err, ShouldBeNil)
 		// register DataNode created to MasterNode
 		status := s.registerDataNode()
@@ -317,9 +370,9 @@ func TestComplicatedReadAndWrite(t *testing.T) {
 					file.WriteAt(ctx, b, uint32(col), uint32(row), " ")
 				}
 			}
-			read, size, err := file.Read(ctx) // must call this before write
-			So(len(read), ShouldEqual, size)
+			_, size, err := file.Read(ctx) // must call this before write
 			So(err, ShouldBeNil)
+			So(size, ShouldBeGreaterThanOrEqualTo, 100/4*8192)
 		})
 		// stop nodes unconditionally
 		Reset(func() {
@@ -331,7 +384,7 @@ func TestComplicatedReadAndWrite(t *testing.T) {
 func TestConcurrentWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
 		// Booting up testing nodes
-		s, err := startNodes()
+		s, err := startNodes(dataNodesNumber)
 		So(err, ShouldBeNil)
 		// register DataNode created to MasterNode
 		status := s.registerDataNode()
@@ -341,23 +394,27 @@ func TestConcurrentWrite(t *testing.T) {
 		So(err, ShouldBeNil)
 
 		// var file File
-		Convey("Read empty file after create", func() {
+		Convey("Read empty file after create", func(conveyC C) {
 			file, err := c.Create(ctx, "test file")
 			So(err, ShouldBeNil)
 			file.Read(ctx) // must call this before write
 
 			// read := make([]byte, 1024)
+			var wg sync.WaitGroup
 			for col := 0; col < 10; col++ {
 				for row := 0; row < 10; row++ {
 					row := row
 					col := col
+					wg.Add(1)
 					go func() {
 						b := constructData(uint32(col), uint32(row))
 						file.WriteAt(ctx, b, uint32(col), uint32(row), " ")
+						wg.Done()
 					}()
 				}
 			}
 
+			wg.Wait()
 			read, size, err := file.Read(ctx) // must call this before write
 			So(len(read), ShouldEqual, size)
 			So(err, ShouldBeNil)

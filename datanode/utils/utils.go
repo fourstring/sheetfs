@@ -5,7 +5,6 @@ import (
 	"os"
 	"sheetfs/config"
 	"sheetfs/datanode/buffmgr"
-	"strconv"
 )
 
 /* private functions */
@@ -18,10 +17,6 @@ func uint64ToBytes(i uint64) []byte {
 
 func bytesToUint64(buf []byte) uint64 {
 	return binary.BigEndian.Uint64(buf)
-}
-
-func GetFilename(id uint64) string {
-	return config.FILE_LOCATION + "chunk_" + strconv.FormatUint(id, 10)
 }
 
 func GetPaddedData(data []byte, size uint64, padding string) []byte {

@@ -12,6 +12,7 @@ import (
 
 var address = flag.String("a", "", "address to which the datanode listens")
 var masterAddr = flag.String("m", "", "address of master node")
+var dataPath = flag.String("d", "", "path of data files")
 
 func main() {
 	flag.Parse()
@@ -21,7 +22,7 @@ func main() {
 	}
 
 	s := grpc.NewServer()
-	fsrpc.RegisterDataNodeServer(s, server.NewServer())
+	fsrpc.RegisterDataNodeServer(s, server.NewServer(*dataPath))
 
 	conn, err := grpc.Dial(*masterAddr, grpc.WithInsecure(), grpc.WithBlock())
 	if err != nil {

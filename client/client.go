@@ -122,10 +122,9 @@ func (c *Client) Open(ctx context.Context, name string) (f *File, err error) {
 	}
 }
 
-func (c *Client) checkNewDataNode(reply *fsrpc.ReadSheetReply) {
+func (c *Client) checkNewDataNode(chunks []*fsrpc.Chunk) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	chunks := reply.Chunks
 
 	for _, chunk := range chunks {
 		// register new client node
@@ -141,7 +140,7 @@ func (c *Client) checkNewDataNode(reply *fsrpc.ReadSheetReply) {
 	}
 }
 
-func (c *Client) concurrentReadChunk(ctx context.Context, in *fsrpc.ReadChunkRequest, opts ...grpc.CallOption) (*fsrpc.ReadChunkReply, error) {
+func (c *Client) concurrentReadChunk(ctx context.Context, chunk *fsrpc.Chunk, in *fsrpc.ReadChunkRequest, opts ...grpc.CallOption) (*fsrpc.ReadChunkReply, error) {
 	/*var wg sync.WaitGroup
 
 	// reply map
@@ -177,14 +176,18 @@ func (c *Client) concurrentReadChunk(ctx context.Context, in *fsrpc.ReadChunkReq
 	*/
 	var dc fsrpc.DataNodeClient
 	c.mu.RLock()
-	for _, client := range c.datanodeClientMap {
-		dc = client
+	for addr, client := range c.datanodeClientMap {
+		if addr == chunk.Datanode {
+			// When quorum is introduced, a collection of DataNodeClient should be used here.
+			dc = client
+			break
+		}
 	}
 	c.mu.RUnlock()
 	return dc.ReadChunk(ctx, in, opts...)
 }
 
-func (c *Client) concurrentWriteChunk(ctx context.Context, in *fsrpc.WriteChunkRequest, opts ...grpc.CallOption) (*fsrpc.WriteChunkReply, error) {
+func (c *Client) concurrentWriteChunk(ctx context.Context, chunk *fsrpc.Chunk, in *fsrpc.WriteChunkRequest, opts ...grpc.CallOption) (*fsrpc.WriteChunkReply, error) {
 	/*
 		var wg sync.WaitGroup
 		wg.Add(1)
@@ -216,8 +219,12 @@ func (c *Client) concurrentWriteChunk(ctx context.Context, in *fsrpc.WriteChunkR
 	*/
 	var dc fsrpc.DataNodeClient
 	c.mu.RLock()
-	for _, client := range c.datanodeClientMap {
-		dc = client
+	for addr, client := range c.datanodeClientMap {
+		if addr == chunk.Datanode {
+			// When quorum is introduced, a collection of DataNodeClient should be used here.
+			dc = client
+			break
+		}
 	}
 	c.mu.RUnlock()
 	return dc.WriteChunk(ctx, in, opts...)

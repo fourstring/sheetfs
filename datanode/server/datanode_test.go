@@ -12,11 +12,13 @@ import (
 )
 
 func TestDatanode(t *testing.T) {
-	s := server{}
-
-	dir, _ := ioutil.ReadDir(config.FILE_LOCATION)
+	dir, _ := ioutil.ReadDir("./data")
 	for _, d := range dir {
 		os.RemoveAll(path.Join([]string{config.FILE_LOCATION, d.Name()}...))
+	}
+
+	s := server{
+		dataPath: "./data",
 	}
 
 	// first create
