@@ -35,8 +35,21 @@ func main() {
 			break
 		}
 		fmt.Printf("%s: I'm secondary and watching %s\n", *id, watch)
-		<-notify
+		done := false
+		for !done {
+			select {
+			case <-notify:
+				done = true
+			default:
+				/*
+					Do works of a secondary node here.
+				*/
+			}
+		}
 	}
+	/*
+		MUST complete all preparation required to serve requests before AckLeader!
+	*/
 	fmt.Printf("%s: I'm primary!\n", *id)
 	err = e.AckLeader(*id)
 	if err != nil {

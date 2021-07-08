@@ -45,11 +45,11 @@ func NewElector(servers []string, timeout time.Duration, electionZnode string, e
 		return nil, err
 	}
 	_, err = conn.Create(electionZnode, []byte{}, 0, zk.WorldACL(zk.PermAll))
-	if !errors.Is(err, zk.ErrNodeExists) {
+	if err != nil && !errors.Is(err, zk.ErrNodeExists) {
 		return nil, err
 	}
 	_, err = conn.Create(electionAck, []byte{}, 0, zk.WorldACL(zk.PermAll))
-	if !errors.Is(err, zk.ErrNodeExists) {
+	if err != nil && !errors.Is(err, zk.ErrNodeExists) {
 		return nil, err
 	}
 	return &Elector{conn: conn, electionZnode: electionZnode, proposePath: fmt.Sprintf("%s/%s", electionZnode, electionPrefix), electionAck: electionAck}, nil
