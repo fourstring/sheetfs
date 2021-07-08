@@ -9,6 +9,7 @@ import (
 )
 
 /*
+Elector
 Providing Object-Oriented API to manage the election process. Every node who wants to be the
 primary should initialize an Elector and participate in the election through it.
 */
@@ -21,6 +22,7 @@ type Elector struct {
 }
 
 /*
+NewElector
 Create an Elector instance and ensures that both of {electionZnode} and {electionAck} has been
 created. Caller has no need to create them manually.
 
@@ -56,6 +58,7 @@ func NewElector(servers []string, timeout time.Duration, electionZnode string, e
 }
 
 /*
+CreateProposal
 Create a Sequential|Ephemeral Znode named as '{electionZnode}/{electionPrefix}'.
 Because Sequential Flag is applied, the name of finally created Znode will be
 '{electionZnode}/{electionPrefix}-XXXXXXXXXX'. As mentioned in Zookeeper's
@@ -81,6 +84,7 @@ func (e *Elector) CreateProposal() (string, error) {
 }
 
 /*
+TryBeLeader
 Check all children Znode of electionZnode(or all proposals) with smaller suffix than
 proposal of called itself. Due to sequential guarantee of Zookeeper, a node always gain a
 consistent view of its proceding proposals. If the caller owns smallest proposal, than it is
@@ -124,6 +128,7 @@ func (e *Elector) TryBeLeader() (bool, string, <-chan zk.Event, error) {
 }
 
 /*
+AckLeader
 Write info into electionAck Znode if a node become the primary one successfully. And
 the others can understand that who is the primary through reading electionAck.
 
