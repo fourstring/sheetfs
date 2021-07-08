@@ -2,19 +2,19 @@
 
 ## 0. Release地址
 
-https://github.com/fourstring/sheetfs/releases/tag/v0.2.0
+https://github.com/fourstring/sheetfs/releases/tag/v0.2.1
 
 ## 1.添加依赖
 
 在后端根目录下执行：
 
 ```bash
-go get github.com/fourstring/sheetfs@v0.2.0
+go get github.com/fourstring/sheetfs@v0.2.1
 ```
 
 ## 2. API
 
-详细Reference见https://pkg.go.dev/github.com/fourstring/sheetfs@v0.2.0/fsclient
+详细Reference见https://pkg.go.dev/github.com/fourstring/sheetfs@v0.2.1/fsclient
 
 ```go
 func main() {
@@ -59,7 +59,7 @@ switch err.(type) {
 ```bash
 git clone https://github.com/fourstring/sheetfs
 cd sheetfs
-git checkout v0.2.0
+git checkout v0.2.1
 ```
 
 然后安装docker-compose:
