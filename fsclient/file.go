@@ -55,7 +55,6 @@ func (f *File) Read(ctx context.Context) (b []byte, n int64, err error) {
 	default:
 		return []byte{}, -1, NewUnexpectedStatusError(masterReply.Status)
 	}
-
 	// read every chunk of the file
 	var wg sync.WaitGroup
 	data := make([]byte, 0)
@@ -119,7 +118,7 @@ func (f *File) Read(ctx context.Context) (b []byte, n int64, err error) {
 				}
 
 				if chunk.HoldsMeta {
-					copy(metaData, dataReply.Data)
+					metaData = dataReply.Data
 				} else {
 					workerMu.Lock()
 					data = append(data, dataReply.Data...)
