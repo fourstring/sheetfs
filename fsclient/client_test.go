@@ -338,6 +338,15 @@ func TestReadAndWrite(t *testing.T) {
 			So(read[:len(b)], ShouldResemble, b)
 			So(size, ShouldEqual, 2048)
 			So(err, ShouldBeNil)
+
+			size, err = file.WriteAt(ctx, b, MetaCellRow, MetaCellCol, " ")
+			So(size, ShouldEqual, len(b))
+			So(err, ShouldBeNil)
+
+			size, err = file.ReadAt(ctx, read, MetaCellRow, MetaCellCol)
+			So(read[:len(b)], ShouldResemble, b)
+			So(size, ShouldEqual, 8192)
+			So(err, ShouldBeNil)
 		})
 		// stop nodes unconditionally
 		Reset(func() {
