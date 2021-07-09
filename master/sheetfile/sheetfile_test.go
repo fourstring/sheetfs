@@ -144,7 +144,7 @@ func TestCreateSheetFile(t *testing.T) {
 				So(metaCell.Size, ShouldEqual, config.BytesPerChunk)
 				So(metaCell.Offset, ShouldEqual, 0)
 				// check metaChunk
-				So(metaChunk.Version, ShouldEqual, 1)
+				So(metaChunk.Version, ShouldEqual, 0)
 				So(metaChunk.isAvailable(config.MaxBytesPerCell), ShouldEqual, false)
 				// check relationship between metaCell and metaChunk
 				So(metaCell.ChunkID, ShouldEqual, metaChunk.ID)
@@ -190,8 +190,7 @@ func TestSheetFile_WriteCellChunk_GetAllChunks(t *testing.T) {
 		Convey("Write to MetaCell", func() {
 			cell, chunk, err := file.WriteCellChunk(config.SheetMetaCellRow, config.SheetMetaCellCol, db)
 			So(err, ShouldBeNil)
-			// The MetaCell-holding chunk's version is 1 initially
-			So(chunk.Version, ShouldEqual, 2)
+			So(chunk.Version, ShouldEqual, 1)
 			So(cell.IsMeta(), ShouldBeTrue)
 			So(cell.ChunkID, ShouldEqual, chunk.ID)
 		})
@@ -300,8 +299,6 @@ func TestSheetFile_Concurrency1(t *testing.T) {
 			for i := uint64(1); i < maxChunks+1; i++ {
 				expectedVersions[i] = new(uint64)
 			}
-			// For MetaCell
-			*expectedVersions[1] = 1
 			worker := func() {
 				defer wg.Done()
 				for i := 0; i < 100; i++ {

@@ -79,9 +79,7 @@ func CreateSheetFile(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator, filen
 		return nil, err
 	}
 	// Create Chunk and MetaCell
-	// When Chunk is empty, its Version is 0. We add a Cell to this Chunk immediately,
-	// So let its Version equals to 1 here.
-	chunk := &Chunk{DataNode: dataNode, Version: 1}
+	chunk := &Chunk{DataNode: dataNode, Version: 0}
 	chunk.Persistent(db)
 	metaCell := NewCell(config.SheetMetaCellID, 0, config.BytesPerChunk, chunk.ID, filename)
 	chunk.Cells = []*Cell{metaCell}
