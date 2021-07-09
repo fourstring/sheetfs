@@ -3,7 +3,12 @@ package fsclient
 func connect(data []byte, metadata []byte) []byte {
 	totalData := []byte("{\"celldata\": [") //header
 	if len(data) > 0 {                      // delete the final ","
-		data = data[:len(data)-1]
+		for i := len(data) - 1; i >= 0; i-- {
+			if data[i] == ',' {
+				data[i] = ' '
+				break
+			}
+		}
 	}
 	totalData = append(totalData, data...) //data
 	if len(metadata) > 0 {
