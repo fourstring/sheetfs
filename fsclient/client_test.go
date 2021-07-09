@@ -328,13 +328,22 @@ func TestReadAndWrite(t *testing.T) {
 			So(read[:len(header)], ShouldResemble, header)
 
 			// read := make([]byte, 1024)
-			b := []byte("this is test")
+			b := []byte("this is test,")
 
 			size, err := file.WriteAt(ctx, b, 0, 0, " ")
 			So(size, ShouldEqual, len(b))
 			So(err, ShouldBeNil)
 
 			size, err = file.ReadAt(ctx, read, 0, 0)
+			So(read[:len(b)], ShouldResemble, b)
+			So(size, ShouldEqual, 2048)
+			So(err, ShouldBeNil)
+
+			size, err = file.WriteAt(ctx, b, 1, 1, " ")
+			So(size, ShouldEqual, len(b))
+			So(err, ShouldBeNil)
+
+			size, err = file.ReadAt(ctx, read, 1, 1)
 			So(read[:len(b)], ShouldResemble, b)
 			So(size, ShouldEqual, 2048)
 			So(err, ShouldBeNil)
