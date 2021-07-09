@@ -27,3 +27,14 @@ func RandInt(a, b int) int {
 func DivRoundUp(n, d int) int {
 	return (n + (d - 1)) / d
 }
+
+var letters = []rune("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ")
+
+func RandStr(n int) string {
+	rand.Seed(time.Now().UnixNano())
+	b := make([]rune, n)
+	for i := range b {
+		b[i] = letters[rand.Intn(len(letters))]
+	}
+	return string(b)
+}
