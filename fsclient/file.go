@@ -122,7 +122,6 @@ func (f *File) Read(ctx context.Context) (b []byte, n int64, err error) {
 				} else {
 					workerMu.Lock()
 					data = append(data, dataReply.Data...)
-					data = append(data, ","...)
 					workerMu.Unlock()
 				}
 				return
