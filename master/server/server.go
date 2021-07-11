@@ -3,12 +3,10 @@ package server
 import (
 	context "context"
 	"github.com/fourstring/sheetfs/master/datanode_alloc"
-	"github.com/fourstring/sheetfs/master/errors"
 	"github.com/fourstring/sheetfs/master/filemgr"
-	"github.com/fourstring/sheetfs/master/sheetfile"
+	"github.com/fourstring/sheetfs/master/filemgr/file_errors"
 	fs_rpc "github.com/fourstring/sheetfs/protocol"
 	"go.uber.org/zap"
-	"gorm.io/gorm"
 )
 
 type server struct {
@@ -20,25 +18,18 @@ type server struct {
 
 /*
 NewServer
-AutoMigrate sqlite table structure for MapEntry and Chunk (Tables for Cell will
-be created during file creation). Then initialize a zap Logger and load FileManager
-from database to create a server.
 
 @para
-	db: a gorm connection. It can't be a transaction.
+	fm: a initialized FileManager
 
 @return
 	*server: initialized server
 	error:
 		errors during auto migration.
 */
-func NewServer(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator) (*server, error) {
-	err := db.AutoMigrate(&filemgr.MapEntry{}, &sheetfile.Chunk{})
-	if err != nil {
-		return nil, err
-	}
+func NewServer(fm *filemgr.FileManager, alloc *datanode_alloc.DataNodeAllocator) (*server, error) {
 	logger, _ := zap.NewProduction()
-	s := &server{fileMgr: filemgr.LoadFileManager(db, alloc), logger: logger, alloc: alloc}
+	s := &server{fileMgr: fm, logger: logger, alloc: alloc}
 	return s, nil
 }
 
@@ -54,15 +45,15 @@ to RPC client according to the kind of err, and logging the err through zap.
 func (s *server) defaultErrorHandler(err error, status *fs_rpc.Status) {
 	defer s.logger.Sync()
 	switch err.(type) {
-	case *errors.FileExistsError:
+	case *file_errors.FileExistsError:
 		*status = fs_rpc.Status_Exist
-	case *errors.CellNotFoundError:
+	case *file_errors.CellNotFoundError:
 		*status = fs_rpc.Status_Invalid
-	case *errors.FileNotFoundError:
+	case *file_errors.FileNotFoundError:
 		*status = fs_rpc.Status_NotFound
-	case *errors.FdNotFoundError:
+	case *file_errors.FdNotFoundError:
 		*status = fs_rpc.Status_NotFound
-	case *errors.NoDataNodeError:
+	case *datanode_alloc.NoDataNodeError:
 		*status = fs_rpc.Status_Unavailable
 	default:
 		*status = fs_rpc.Status_Unavailable

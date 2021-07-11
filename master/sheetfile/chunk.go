@@ -54,7 +54,7 @@ This method should be used only for checkpointing, and is supposed to be called
 in a transaction for atomicity.
 */
 func (c *Chunk) Persistent(tx *gorm.DB) {
-	tx.Omit(clause.Associations).Save(c)
+	tx.Omit(clause.Associations).Clauses(clause.OnConflict{UpdateAll: true}).Save(c)
 }
 
 /*

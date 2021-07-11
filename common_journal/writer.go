@@ -110,8 +110,9 @@ Internally, we use a writer-preferred RWMutex here, to make Checkpoint operation
 CommitEntry, and all CommitEntry don't interfere with each other. PrepareCheckpoint will Lock this
 RWMutex, and CommitEntry will RLock it.
 */
-func (w *Writer) PrepareCheckpoint() {
+func (w *Writer) PrepareCheckpoint() int64 {
 	w.ckptMu.Lock()
+	return w.lastWriteOffset
 }
 
 /*

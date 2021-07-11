@@ -3,7 +3,8 @@ package filemgr
 import (
 	"fmt"
 	"github.com/fourstring/sheetfs/master/datanode_alloc"
-	"github.com/fourstring/sheetfs/master/errors"
+	"github.com/fourstring/sheetfs/master/filemgr/file_errors"
+	"github.com/fourstring/sheetfs/master/filemgr/mgr_entry"
 	"github.com/fourstring/sheetfs/master/sheetfile"
 	"github.com/fourstring/sheetfs/tests"
 	. "github.com/smartystreets/goconvey/convey"
@@ -13,11 +14,11 @@ import (
 )
 
 func shouldBeSameEntry(actual interface{}, expected ...interface{}) string {
-	am, ok := actual.(*MapEntry)
+	am, ok := actual.(*mgr_entry.MapEntry)
 	if !ok {
 		return "actual not a *MapEntry!"
 	}
-	em, ok := expected[0].(*MapEntry)
+	em, ok := expected[0].(*mgr_entry.MapEntry)
 	if !ok {
 		return "expected not a *MapEntry!"
 	}
@@ -29,14 +30,14 @@ func shouldBeSameEntry(actual interface{}, expected ...interface{}) string {
 }
 
 func newTestFileManager() (*FileManager, *gorm.DB, *datanode_alloc.DataNodeAllocator, error) {
-	db, err := tests.GetTestDB(&sheetfile.Chunk{}, &MapEntry{})
+	db, err := tests.GetTestDB(&sheetfile.Chunk{}, &mgr_entry.MapEntry{})
 	if err != nil {
 		return nil, nil, nil, err
 	}
 	alloc := datanode_alloc.NewDataNodeAllocator()
 	alloc.AddDataNode("node1")
 	fm := &FileManager{
-		entries: map[string]*MapEntry{},
+		entries: map[string]*mgr_entry.MapEntry{},
 		opened:  map[string]*sheetfile.SheetFile{},
 		fds:     map[uint64]string{},
 		nextFd:  0,
@@ -57,7 +58,7 @@ func TestFileManager_CreateSheet(t *testing.T) {
 				So(err, ShouldBeNil)
 				So(fd, ShouldEqual, uint64(i))
 				entry := fm.entries[filename]
-				So(entry, shouldBeSameEntry, &MapEntry{
+				So(entry, shouldBeSameEntry, &mgr_entry.MapEntry{
 					FileName:       filename,
 					CellsTableName: sheetfile.GetCellTableName(filename),
 					Recycled:       false,
@@ -66,7 +67,7 @@ func TestFileManager_CreateSheet(t *testing.T) {
 
 			Convey("Create existed file", func() {
 				_, err := fm.CreateSheet("sheet0")
-				So(err, ShouldBeError, errors.NewFileExistsError("sheet0"))
+				So(err, ShouldBeError, file_errors.NewFileExistsError("sheet0"))
 			})
 		})
 	})
@@ -87,7 +88,7 @@ func TestFileManager_OpenSheet(t *testing.T) {
 			So(fm.fds[fd] == fm.fds[fd1] && fm.fds[fd1] == fm.fds[fd2], ShouldBeTrue)
 			Convey("Open non-existed file", func() {
 				_, err := fm.OpenSheet("non-existed")
-				So(err, ShouldBeError, errors.NewFileNotFoundError("non-existed"))
+				So(err, ShouldBeError, file_errors.NewFileNotFoundError("non-existed"))
 			})
 		})
 	})
@@ -110,7 +111,7 @@ func TestFileManager_Persistent(t *testing.T) {
 			So(len(sheet0.Cells), ShouldEqual, 0)
 			err = fm.Persistent()
 			So(err, ShouldBeNil)
-			var entries []*MapEntry
+			var entries []*mgr_entry.MapEntry
 			db.Find(&entries)
 			So(len(entries), ShouldEqual, 3)
 			for i := 0; i < 3; i++ {
@@ -135,7 +136,7 @@ func TestLoadFileManager(t *testing.T) {
 		err = fm.Persistent()
 		So(err, ShouldBeNil)
 		Convey("Load FileManager", func() {
-			fm = LoadFileManager(db, alloc)
+			fm = LoadFileManager(db, alloc, nil)
 			So(len(fm.entries), ShouldEqual, 3)
 			for i := 0; i < 3; i++ {
 				filename := fmt.Sprintf("sheet%d", i)
@@ -153,7 +154,7 @@ func TestFileManager_RecycleSheet(t *testing.T) {
 		Convey("Recycle a sheet", func() {
 			fm.RecycleSheet("sheet0")
 			_, err := fm.OpenSheet("sheet0")
-			So(err, ShouldBeError, errors.NewFileNotFoundError("sheet0"))
+			So(err, ShouldBeError, file_errors.NewFileNotFoundError("sheet0"))
 			_, _, err = fm.WriteFileCell(fd, 0, 0)
 			So(err, ShouldBeNil)
 		})
@@ -168,7 +169,7 @@ func TestFileManager_ResumeSheet(t *testing.T) {
 		Convey("Recycle a sheet", func() {
 			fm.RecycleSheet("sheet0")
 			_, err := fm.OpenSheet("sheet0")
-			So(err, ShouldBeError, errors.NewFileNotFoundError("sheet0"))
+			So(err, ShouldBeError, file_errors.NewFileNotFoundError("sheet0"))
 			_, _, err = fm.WriteFileCell(fd, 0, 0)
 			So(err, ShouldBeNil)
 			Convey("Resume a sheet", func() {
@@ -244,7 +245,7 @@ func TestFileManager_ReadSheet(t *testing.T) {
 			}
 			Convey("Read entire test file", func() {
 				_, err := fm.ReadSheet(0xdeafbeef)
-				So(err, ShouldBeError, errors.NewFdNotFoundError(0xdeafbeef))
+				So(err, ShouldBeError, file_errors.NewFdNotFoundError(0xdeafbeef))
 				chunks, err := fm.ReadSheet(fd)
 				So(err, ShouldBeNil)
 				So(len(chunks), ShouldEqual, 4)
@@ -271,7 +272,7 @@ func TestFileManager_ReadFileCell(t *testing.T) {
 					So(cell.ChunkID, ShouldEqual, chunk.ID)
 				}
 				_, _, err := fm.ReadFileCell(fd, 1111, 1111)
-				So(err, ShouldBeError, errors.NewCellNotFoundError(1111, 1111))
+				So(err, ShouldBeError, file_errors.NewCellNotFoundError(1111, 1111))
 			})
 		})
 	})

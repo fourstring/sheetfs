@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/fourstring/sheetfs/master/config"
 	"gorm.io/gorm"
+	"gorm.io/gorm/clause"
 	"strings"
 	"text/template"
 )
@@ -37,11 +38,11 @@ type Cell struct {
 	Size    uint64
 	ChunkID uint64
 
-	sheetName string `gorm:"-"`
+	SheetName string `gorm:"-"`
 }
 
 func NewCell(cellID int64, offset uint64, size uint64, chunkID uint64, sheetName string) *Cell {
-	return &Cell{CellID: cellID, Offset: offset, Size: size, ChunkID: chunkID, sheetName: sheetName}
+	return &Cell{CellID: cellID, Offset: offset, Size: size, ChunkID: chunkID, SheetName: sheetName}
 }
 
 /*
@@ -49,7 +50,7 @@ TableName
 Returns the table name which contains cells of some SheetFile.
 */
 func (c *Cell) TableName() string {
-	return GetCellTableName(c.sheetName)
+	return GetCellTableName(c.SheetName)
 }
 
 /*
@@ -71,7 +72,7 @@ GetCellTableName
 Same as Cell.TableName, for creation of Cell.
 
 @return
-	sqlite table name to store Cell of sheetName
+	sqlite table name to store Cell of SheetName
 */
 func GetCellTableName(sheetName string) string {
 	return fmt.Sprintf("cells_%s", sheetName)
@@ -100,7 +101,7 @@ After loading from sqlite, subsequent mutations should be conducted in memory,
 and rely on journaling to tolerate failure, until checkpointing next time.
 
 @return
-	[]*Cell: All Cell stored in table corresponding to sheetName
+	[]*Cell: All Cell stored in table corresponding to SheetName
 */
 func GetSheetCellsAll(db *gorm.DB, sheetName string) []*Cell {
 	cells := []*Cell{}
@@ -131,13 +132,13 @@ func init() {
 
 /*
 CreateCellTableIfNotExists
-Query the sqlite_master table to check whether Cell table for sheetName has existed or not.
+Query the sqlite_master table to check whether Cell table for SheetName has existed or not.
 If not, create such a table with create_tmpl. Creating a table in transactions is not allowed
 in sqlite, so this function should not be called in db.Transaction.
 
 @para
 	db: a gorm connection, should not be a transaction.
-	sheetName: filename of Cell belongs to.
+	SheetName: filename of Cell belongs to.
 
 @return
 	error from execution of queries. If this function is called in a transaction, a 'database is locked'
@@ -180,7 +181,9 @@ This method should be used only for checkpointing, and is supposed to be called
 in a transaction for atomicity.
 */
 func (c *Cell) Persistent(tx *gorm.DB) {
-	tx.Table(c.TableName()).Save(c)
+	tx.Table(c.TableName()).Clauses(clause.OnConflict{
+		UpdateAll: true,
+	}).Create(c)
 }
 
 /*
