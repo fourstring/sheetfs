@@ -17,9 +17,13 @@ type DataNodeAllocator struct {
 
 func NewDataNodeAllocator() *DataNodeAllocator {
 	return &DataNodeAllocator{
-		dataNodes:    []*dataNode{},
-		dataNodesSet: map[string]struct{}{},
-		curPos:       0,
+		dataNodes: []*dataNode{{
+			address: "node1",
+		}},
+		dataNodesSet: map[string]struct{}{
+			"node1": {},
+		},
+		curPos: 0,
 	}
 }
 

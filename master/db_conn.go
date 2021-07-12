@@ -3,7 +3,7 @@ package main
 import (
 	"github.com/fourstring/sheetfs/master/config"
 	"github.com/fourstring/sheetfs/master/filemgr/mgr_entry"
-	"github.com/fourstring/sheetfs/master/journal"
+	"github.com/fourstring/sheetfs/master/journal/checkpoint"
 	"github.com/fourstring/sheetfs/master/sheetfile"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -14,7 +14,7 @@ func connectDB() (*gorm.DB, error) {
 	if err != nil {
 		return nil, err
 	}
-	err = db.AutoMigrate(&mgr_entry.MapEntry{}, &sheetfile.Chunk{}, &journal.Checkpoint{})
+	err = db.AutoMigrate(&mgr_entry.MapEntry{}, &sheetfile.Chunk{}, &checkpoint.Checkpoint{})
 	if err != nil {
 		return nil, err
 	}

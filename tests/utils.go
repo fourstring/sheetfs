@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"math/rand"
@@ -9,6 +10,18 @@ import (
 
 func GetTestDB(automigrates ...interface{}) (*gorm.DB, error) {
 	db, err := gorm.Open(sqlite.Open("file::memory:"), &gorm.Config{})
+	if err != nil {
+		return nil, err
+	}
+	err = db.AutoMigrate(automigrates...)
+	if err != nil {
+		return nil, err
+	}
+	return db, nil
+}
+
+func GetPersistTestDB(dbName string, automigrates ...interface{}) (*gorm.DB, error) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("%s.db", dbName)), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

@@ -163,10 +163,9 @@ func CreateCellTableIfNotExists(db *gorm.DB, sheetName string) error {
 		if err != nil {
 			return err
 		}
-		create_query := b.String()
-		_, err = rawdb.Exec(create_query)
+		createQuery := b.String()
+		_, err = rawdb.Exec(createQuery)
 		if err != nil {
-			fmt.Printf("69: %v", err)
 			return err
 		}
 	}

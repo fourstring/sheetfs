@@ -7,7 +7,7 @@ import (
 	"github.com/fourstring/sheetfs/master/datanode_alloc"
 	"github.com/fourstring/sheetfs/master/filemgr"
 	"github.com/fourstring/sheetfs/master/filemgr/mgr_entry"
-	"github.com/fourstring/sheetfs/master/journal"
+	"github.com/fourstring/sheetfs/master/journal/checkpoint"
 	"github.com/fourstring/sheetfs/master/sheetfile"
 	fs_rpc "github.com/fourstring/sheetfs/protocol"
 	"github.com/fourstring/sheetfs/tests"
@@ -18,8 +18,8 @@ import (
 
 var ctx = goctx.Background()
 
-func newTestServer() (*server, error) {
-	db, err := tests.GetTestDB(&mgr_entry.MapEntry{}, &sheetfile.Chunk{}, &journal.Checkpoint{})
+func newTestServer() (*Server, error) {
+	db, err := tests.GetTestDB(&mgr_entry.MapEntry{}, &sheetfile.Chunk{}, &checkpoint.Checkpoint{})
 	if err != nil {
 		return nil, err
 	}
@@ -69,7 +69,7 @@ func shouldBeSameCell(actual interface{}, expected ...interface{}) string {
 
 func TestServer_RegisterDataNode(t *testing.T) {
 	Convey("Build test server", t, func() {
-		db, err := tests.GetTestDB(&mgr_entry.MapEntry{}, &sheetfile.Chunk{}, &journal.Checkpoint{})
+		db, err := tests.GetTestDB(&mgr_entry.MapEntry{}, &sheetfile.Chunk{}, &checkpoint.Checkpoint{})
 		So(err, ShouldBeNil)
 		alloc := datanode_alloc.NewDataNodeAllocator()
 		fm := filemgr.LoadFileManager(db, alloc, nil)

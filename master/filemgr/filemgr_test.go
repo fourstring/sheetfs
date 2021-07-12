@@ -37,9 +37,9 @@ func newTestFileManager() (*FileManager, *gorm.DB, *datanode_alloc.DataNodeAlloc
 	alloc := datanode_alloc.NewDataNodeAllocator()
 	alloc.AddDataNode("node1")
 	fm := &FileManager{
-		entries: map[string]*mgr_entry.MapEntry{},
-		opened:  map[string]*sheetfile.SheetFile{},
-		fds:     map[uint64]string{},
+		Entries: map[string]*mgr_entry.MapEntry{},
+		Opened:  map[string]*sheetfile.SheetFile{},
+		Fds:     map[uint64]string{},
 		nextFd:  0,
 		db:      db,
 		alloc:   alloc,
@@ -57,7 +57,7 @@ func TestFileManager_CreateSheet(t *testing.T) {
 				fd, err := fm.CreateSheet(filename)
 				So(err, ShouldBeNil)
 				So(fd, ShouldEqual, uint64(i))
-				entry := fm.entries[filename]
+				entry := fm.Entries[filename]
 				So(entry, shouldBeSameEntry, &mgr_entry.MapEntry{
 					FileName:       filename,
 					CellsTableName: sheetfile.GetCellTableName(filename),
@@ -85,7 +85,7 @@ func TestFileManager_OpenSheet(t *testing.T) {
 			fd2, err := fm.OpenSheet("sheet0")
 			So(err, ShouldBeNil)
 			So(fd2, ShouldEqual, 2)
-			So(fm.fds[fd] == fm.fds[fd1] && fm.fds[fd1] == fm.fds[fd2], ShouldBeTrue)
+			So(fm.Fds[fd] == fm.Fds[fd1] && fm.Fds[fd1] == fm.Fds[fd2], ShouldBeTrue)
 			Convey("Open non-existed file", func() {
 				_, err := fm.OpenSheet("non-existed")
 				So(err, ShouldBeError, file_errors.NewFileNotFoundError("non-existed"))
@@ -137,10 +137,10 @@ func TestLoadFileManager(t *testing.T) {
 		So(err, ShouldBeNil)
 		Convey("Load FileManager", func() {
 			fm = LoadFileManager(db, alloc, nil)
-			So(len(fm.entries), ShouldEqual, 3)
+			So(len(fm.Entries), ShouldEqual, 3)
 			for i := 0; i < 3; i++ {
 				filename := fmt.Sprintf("sheet%d", i)
-				So(fm.entries[filename].FileName, ShouldEqual, filename)
+				So(fm.Entries[filename].FileName, ShouldEqual, filename)
 			}
 		})
 	})
@@ -223,7 +223,7 @@ func TestFileManager_WriteFileCell(t *testing.T) {
 				So(err, ShouldBeNil)
 			}
 			Convey("assert test file", func() {
-				sheet := fm.opened["sheet0"]
+				sheet := fm.Opened["sheet0"]
 				So(len(sheet.Cells), ShouldEqual, 11)
 				So(len(sheet.Chunks), ShouldEqual, 4)
 				So(sheet.LastAvailableChunk.ID, ShouldEqual, 4)

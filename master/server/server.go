@@ -9,7 +9,7 @@ import (
 	"go.uber.org/zap"
 )
 
-type server struct {
+type Server struct {
 	fs_rpc.UnimplementedMasterNodeServer
 	fileMgr *filemgr.FileManager
 	alloc   *datanode_alloc.DataNodeAllocator
@@ -27,9 +27,9 @@ NewServer
 	error:
 		errors during auto migration.
 */
-func NewServer(fm *filemgr.FileManager, alloc *datanode_alloc.DataNodeAllocator) (*server, error) {
+func NewServer(fm *filemgr.FileManager, alloc *datanode_alloc.DataNodeAllocator) (*Server, error) {
 	logger, _ := zap.NewProduction()
-	s := &server{fileMgr: fm, logger: logger, alloc: alloc}
+	s := &Server{fileMgr: fm, logger: logger, alloc: alloc}
 	return s, nil
 }
 
@@ -42,7 +42,7 @@ to RPC client according to the kind of err, and logging the err through zap.
 	err: errors raised from FileManager's methods
 	status: pointer to the status variable to be set
 */
-func (s *server) defaultErrorHandler(err error, status *fs_rpc.Status) {
+func (s *Server) defaultErrorHandler(err error, status *fs_rpc.Status) {
 	defer s.logger.Sync()
 	switch err.(type) {
 	case *file_errors.FileExistsError:
@@ -61,12 +61,12 @@ func (s *server) defaultErrorHandler(err error, status *fs_rpc.Status) {
 	s.logger.Error("MasterNode:", zap.Error(err))
 }
 
-func (s *server) RegisterDataNode(ctx context.Context, request *fs_rpc.RegisterDataNodeRequest) (*fs_rpc.RegisterDataNodeReply, error) {
+func (s *Server) RegisterDataNode(ctx context.Context, request *fs_rpc.RegisterDataNodeRequest) (*fs_rpc.RegisterDataNodeReply, error) {
 	s.alloc.AddDataNode(request.Addr)
 	return &fs_rpc.RegisterDataNodeReply{Status: fs_rpc.Status_OK}, nil
 }
 
-func (s *server) ReadSheet(ctx context.Context, request *fs_rpc.ReadSheetRequest) (*fs_rpc.ReadSheetReply, error) {
+func (s *Server) ReadSheet(ctx context.Context, request *fs_rpc.ReadSheetRequest) (*fs_rpc.ReadSheetReply, error) {
 	status := fs_rpc.Status_OK
 	chunks, err := s.fileMgr.ReadSheet(request.Fd)
 
@@ -93,7 +93,7 @@ func (s *server) ReadSheet(ctx context.Context, request *fs_rpc.ReadSheetRequest
 	return reply, nil
 }
 
-func (s *server) CreateSheet(ctx context.Context, request *fs_rpc.CreateSheetRequest) (*fs_rpc.CreateSheetReply, error) {
+func (s *Server) CreateSheet(ctx context.Context, request *fs_rpc.CreateSheetRequest) (*fs_rpc.CreateSheetReply, error) {
 	status := fs_rpc.Status_OK
 	fd, err := s.fileMgr.CreateSheet(request.Filename)
 	if err != nil {
@@ -109,11 +109,11 @@ func (s *server) CreateSheet(ctx context.Context, request *fs_rpc.CreateSheetReq
 	}, nil
 }
 
-func (s *server) DeleteSheet(ctx context.Context, request *fs_rpc.DeleteSheetRequest) (*fs_rpc.DeleteSheetReply, error) {
+func (s *Server) DeleteSheet(ctx context.Context, request *fs_rpc.DeleteSheetRequest) (*fs_rpc.DeleteSheetReply, error) {
 	panic("implement me")
 }
 
-func (s *server) OpenSheet(ctx context.Context, request *fs_rpc.OpenSheetRequest) (*fs_rpc.OpenSheetReply, error) {
+func (s *Server) OpenSheet(ctx context.Context, request *fs_rpc.OpenSheetRequest) (*fs_rpc.OpenSheetReply, error) {
 	status := fs_rpc.Status_OK
 	fd, err := s.fileMgr.OpenSheet(request.Filename)
 	if err != nil {
@@ -129,7 +129,7 @@ func (s *server) OpenSheet(ctx context.Context, request *fs_rpc.OpenSheetRequest
 	}, nil
 }
 
-func (s *server) RecycleSheet(ctx context.Context, request *fs_rpc.RecycleSheetRequest) (*fs_rpc.RecycleSheetReply, error) {
+func (s *Server) RecycleSheet(ctx context.Context, request *fs_rpc.RecycleSheetRequest) (*fs_rpc.RecycleSheetReply, error) {
 	status := fs_rpc.Status_OK
 	s.fileMgr.RecycleSheet(request.Filename)
 	return &fs_rpc.RecycleSheetReply{
@@ -137,7 +137,7 @@ func (s *server) RecycleSheet(ctx context.Context, request *fs_rpc.RecycleSheetR
 	}, nil
 }
 
-func (s *server) ResumeSheet(ctx context.Context, request *fs_rpc.ResumeSheetRequest) (*fs_rpc.ResumeSheetReply, error) {
+func (s *Server) ResumeSheet(ctx context.Context, request *fs_rpc.ResumeSheetRequest) (*fs_rpc.ResumeSheetReply, error) {
 	status := fs_rpc.Status_OK
 	s.fileMgr.ResumeSheet(request.Filename)
 	return &fs_rpc.ResumeSheetReply{
@@ -145,7 +145,7 @@ func (s *server) ResumeSheet(ctx context.Context, request *fs_rpc.ResumeSheetReq
 	}, nil
 }
 
-func (s *server) ListSheets(ctx context.Context, empty *fs_rpc.Empty) (*fs_rpc.ListSheetsReply, error) {
+func (s *Server) ListSheets(ctx context.Context, empty *fs_rpc.Empty) (*fs_rpc.ListSheetsReply, error) {
 	status := fs_rpc.Status_OK
 	sheets := s.fileMgr.GetAllSheets()
 	return &fs_rpc.ListSheetsReply{
@@ -154,7 +154,7 @@ func (s *server) ListSheets(ctx context.Context, empty *fs_rpc.Empty) (*fs_rpc.L
 	}, nil
 }
 
-func (s *server) ReadCell(ctx context.Context, request *fs_rpc.ReadCellRequest) (*fs_rpc.ReadCellReply, error) {
+func (s *Server) ReadCell(ctx context.Context, request *fs_rpc.ReadCellRequest) (*fs_rpc.ReadCellReply, error) {
 	status := fs_rpc.Status_OK
 	cell, dataChunk, err := s.fileMgr.ReadFileCell(request.Fd, request.Row, request.Column)
 	if err != nil {
@@ -178,7 +178,7 @@ func (s *server) ReadCell(ctx context.Context, request *fs_rpc.ReadCellRequest) 
 	}, nil
 }
 
-func (s *server) WriteCell(ctx context.Context, request *fs_rpc.WriteCellRequest) (*fs_rpc.WriteCellReply, error) {
+func (s *Server) WriteCell(ctx context.Context, request *fs_rpc.WriteCellRequest) (*fs_rpc.WriteCellReply, error) {
 	status := fs_rpc.Status_OK
 	cell, dataChunk, err := s.fileMgr.WriteFileCell(request.Fd, request.Row, request.Column)
 	if err != nil {

@@ -6,6 +6,7 @@ import (
 	"github.com/fourstring/sheetfs/common_journal"
 	"github.com/fourstring/sheetfs/election"
 	"github.com/fourstring/sheetfs/master/filemgr"
+	"github.com/fourstring/sheetfs/master/journal/checkpoint"
 	entry2 "github.com/fourstring/sheetfs/master/journal/journal_entry"
 	"go.uber.org/zap"
 	"google.golang.org/protobuf/proto"
@@ -53,7 +54,9 @@ func NewListener(config *ListenerConfig) (*Listener, error) {
 func (l *Listener) RunAsSecondary() error {
 	defer l.logger.Sync()
 
-	err := l.receiver.SetOffset(ReadCheckpoint(l.db))
+	ckptOffset := checkpoint.ReadCheckpoint(l.db)
+	err := l.receiver.SetOffset(ckptOffset)
+
 	if err != nil {
 		l.logger.Error("error when loading checkpoint offset.", zap.Error(err))
 		return err
@@ -104,22 +107,30 @@ func (l *Listener) RunAsSecondary() error {
 	return nil
 }
 
+func (l *Listener) handleCheckpoint(ckpt *common_journal.Checkpoint) error {
+	err := l.fm.Persistent()
+	if err != nil {
+		return err
+	}
+	return checkpoint.RecordCheckpoint(l.db, ckpt.NextEntryOffset)
+}
+
 func (l *Listener) handleJournal(entry []byte, ckpt *common_journal.Checkpoint) error {
 	defer l.logger.Sync()
 	if ckpt != nil {
-		err := RecordCheckpoint(l.db, l.fm, ckpt.NextEntryOffset)
+		err := l.handleCheckpoint(ckpt)
 		if err != nil {
 			l.logger.Error("error when recording checkpoint.", zap.Error(err))
 			return err
 		}
 	} else {
-		var masterEntry *entry2.MasterEntry
-		err := proto.Unmarshal(entry, masterEntry)
+		var masterEntry entry2.MasterEntry
+		err := proto.Unmarshal(entry, &masterEntry)
 		if err != nil {
 			l.logger.Error("error when unmarshalling journal entry.", zap.Error(err))
 			return err
 		}
-		err = l.fm.HandleMasterEntry(masterEntry)
+		err = l.fm.HandleMasterEntry(&masterEntry)
 		if err != nil {
 			l.logger.Error("error when applying master journal entry.", zap.Error(err))
 			return err
