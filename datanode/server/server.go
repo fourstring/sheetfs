@@ -16,20 +16,20 @@ import (
 	"strconv"
 )
 
-type server struct {
+type Server struct {
 	fsrpc.UnimplementedDataNodeServer
 	dataPath string
 	writer   *common_journal.Writer
 }
 
-func NewServer(path string, writer *common_journal.Writer) *server {
-	return &server{
+func NewServer(path string, writer *common_journal.Writer) *Server {
+	return &Server{
 		dataPath: path,
 		writer:   writer,
 	}
 }
 
-func (s *server) DeleteChunk(ctx context.Context, request *fsrpc.DeleteChunkRequest) (*fsrpc.DeleteChunkReply, error) {
+func (s *Server) DeleteChunk(ctx context.Context, request *fsrpc.DeleteChunkRequest) (*fsrpc.DeleteChunkReply, error) {
 	reply := new(fsrpc.DeleteChunkReply)
 	reply.Status = fsrpc.Status_OK
 	err := os.Remove(s.getFilename(request.Id))
@@ -39,7 +39,7 @@ func (s *server) DeleteChunk(ctx context.Context, request *fsrpc.DeleteChunkRequ
 	return reply, nil
 }
 
-func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest) (*fsrpc.ReadChunkReply, error) {
+func (s *Server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest) (*fsrpc.ReadChunkReply, error) {
 	reply := new(fsrpc.ReadChunkReply)
 
 	file, err := os.Open(s.getFilename(request.Id))
@@ -76,7 +76,7 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 	return reply, nil
 }
 
-func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkRequest) (*fsrpc.WriteChunkReply, error) {
+func (s *Server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkRequest) (*fsrpc.WriteChunkReply, error) {
 	/* TODO: First write log to Kafka */
 	entry := journal.ConstructEntry(request)
 	for {
@@ -149,11 +149,11 @@ func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 	}
 }
 
-func (s *server) getFilename(id uint64) string {
+func (s *Server) getFilename(id uint64) string {
 	return path.Join(s.dataPath, "chunk_"+strconv.FormatUint(id, 10))
 }
 
-func (s *server) HandleMsg(msg []byte, checkpoint *common_journal.Checkpoint) {
+func (s *Server) HandleMsg(msg []byte) error {
 	// TODO: secondary handle message from kafka
 	version := utils.BytesToUint64(msg[0:8])
 	chunkid := utils.BytesToUint64(msg[8:16])
@@ -186,7 +186,10 @@ func (s *server) HandleMsg(msg []byte, checkpoint *common_journal.Checkpoint) {
 	// the file already exist
 	// check the checksum first
 	oldData := make([]byte, size)
-	file.ReadAt(oldData, int64(offset))
+	_, err = file.ReadAt(oldData, int64(offset))
+	if err != nil {
+		return err
+	}
 	dataCks := crc32.Checksum(oldData, config.Crc32q)
 
 	// if they have different checksum
@@ -199,4 +202,5 @@ func (s *server) HandleMsg(msg []byte, checkpoint *common_journal.Checkpoint) {
 			}
 		}
 	}
+	return nil
 }

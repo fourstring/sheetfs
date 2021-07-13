@@ -3,22 +3,27 @@ package server
 import (
 	"context"
 	"fmt"
-	"github.com/fourstring/sheetfs/config"
+	"github.com/fourstring/sheetfs/common_journal"
+	. "github.com/fourstring/sheetfs/datanode/config"
 	fsrpc "github.com/fourstring/sheetfs/protocol"
-	"io/ioutil"
-	"os"
-	"path"
+	"log"
 	"testing"
 )
 
 func TestDatanode(t *testing.T) {
-	dir, _ := ioutil.ReadDir("./data")
-	for _, d := range dir {
-		os.RemoveAll(path.Join([]string{config.FILE_LOCATION, d.Name()}...))
+	//dir, _ := ioutil.ReadDir("./data")
+	//for _, d := range dir {
+	//	os.RemoveAll(path.Join([]string{FILE_LOCATION, d.Name()}...))
+	//}
+
+	writer, err := common_journal.NewWriter(KafkaServer, KafkaTopic)
+	if err != nil {
+		log.Fatal(err)
 	}
 
-	s := server{
+	s := Server{
 		dataPath: "./data",
+		writer:   writer,
 	}
 
 	// first create
@@ -90,7 +95,7 @@ func TestDatanode(t *testing.T) {
 }
 
 func TestDatanodeParallel(t *testing.T) {
-	//s := server{}
+	//s := Server{}
 	//
 	//dir, _ := ioutil.ReadDir("../data")
 	//for _, d := range dir {
