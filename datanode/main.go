@@ -7,41 +7,36 @@ import (
 	"fmt"
 	"github.com/fourstring/sheetfs/common_journal"
 	journal_example "github.com/fourstring/sheetfs/common_journal/example"
+	"github.com/fourstring/sheetfs/datanode/config"
 	"github.com/fourstring/sheetfs/datanode/server"
 	"github.com/fourstring/sheetfs/election"
 	fsrpc "github.com/fourstring/sheetfs/protocol"
+	"github.com/go-zookeeper/zk"
 	"google.golang.org/grpc"
 	"log"
 	"net"
-	"strings"
 	"time"
 )
 
 var port = flag.Uint("p", 0, "port to listen on")
-var masterZnode = flag.String("m", "", "ID of master node")
+var addr = flag.String("m", "", "addr of datanode")
 var dataPath = flag.String("d", "", "path of data files")
-var serverList = flag.String("sl", "", "list of datanode address, split by ; e.g \"127.0.0.1:2181;127.0.0.1:2182;127.0.0.1:2183\"")
-var proposerId = flag.String("i", "", "ID of proposer")
-var num = flag.Int("n", 5, "Number of messages to produce if this node become primary")
-var ckpt = flag.Bool("c", false, "whether to make a checkpoint after produce {num} messages")
 var nextEntryOffset = flag.Int64("o", 0, "offset of next entry to be consumed")
-
-var electionZnode = "/datanode_election"
-var electionPrefix = "4da1fce7-d3f8-42dd-965d-4c3311661202-n_"
-var electionAck = "/datanode_election_ack"
 
 func main() {
 	flag.Parse()
-	var electionServers = strings.Split(*serverList, ";")
 
 	// Elect
-	e, err := election.NewElector(electionServers, 1*time.Second, electionZnode, electionPrefix, electionAck)
-	proposal, err := e.CreateProposal()
+	e, err := election.NewElector(config.ElectionServers, 1*time.Second,
+		config.ElectionZnode, config.ElectionPrefix, config.ElectionAck)
 	if err != nil {
 		log.Fatal(err)
 	}
-	fmt.Printf("%s: My proposal is %s\n", *proposerId, proposal)
-	receiver, err := common_journal.NewReceiver(journal_example.KafkaServer, journal_example.KafkaTopic)
+	_, err = e.CreateProposal()
+	if err != nil {
+		log.Fatal(err)
+	}
+	receiver, err := common_journal.NewReceiver(config.KafkaServer, config.KafkaTopic)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -50,14 +45,13 @@ func main() {
 		log.Fatal(err)
 	}
 	for {
-		success, watch, notify, err := e.TryBeLeader()
+		success, _, notify, err := e.TryBeLeader()
 		if err != nil {
 			log.Fatal(err)
 		}
 		if success {
 			break
 		}
-		fmt.Printf("%s: I'm secondary and watching %s\n", *proposerId, watch)
 		ctx := common_journal.NewZKEventCancelContext(context.Background(), notify)
 
 		// init a writer
@@ -88,10 +82,8 @@ func main() {
 	/*
 		MUST complete all preparation required to serve requests before AckLeader!
 	*/
-	log.Printf("%s: I'm primary! Start fast forwarding now!\n", *proposerId)
-
 	// init a writer
-	writer, err := common_journal.NewWriter(journal_example.KafkaServer, journal_example.KafkaTopic)
+	writer, err := common_journal.NewWriter(config.KafkaServer, config.KafkaTopic)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -108,15 +100,12 @@ func main() {
 		}
 		s.HandleMsg(msg, ckpt)
 	}
-	log.Printf("%s: I have done all preparations! Start acking as a primary.", *proposerId)
-	err = e.AckLeader(*proposerId)
+
+	err = e.AckLeader(*addr)
 
 	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", *port))
 	if err != nil {
 		log.Fatalf("net.Listen err: %v", err)
-	}
-	if err != nil {
-		log.Fatal(err)
 	}
 	/*
 		Do primary works here
@@ -124,8 +113,20 @@ func main() {
 	ser := grpc.NewServer()
 	fsrpc.RegisterDataNodeServer(ser, s)
 
-	var masterClient fsrpc.MasterNodeClient // TODO: ask what to get master node
-	rep, err := masterClient.RegisterDataNode(context.Background(), &fsrpc.RegisterDataNodeRequest{Addr: *proposerId})
+	// TODO: ask what to get master node
+	connect, _, err := zk.Connect(config.ElectionServers, 1*time.Second)
+	if err != nil {
+		log.Fatalf("Connect masternode server failed.")
+	}
+	masterAddr, _, err := connect.Get(config.MasterAck)
+	if err != nil {
+		log.Fatalf("Get master address from commection failed.")
+	}
+	conn, _ := grpc.Dial(string(masterAddr))
+	var masterClient = fsrpc.NewMasterNodeClient(conn)
+
+	rep, err := masterClient.RegisterDataNode(context.Background(),
+		&fsrpc.RegisterDataNodeRequest{Addr: *addr})
 	if err != nil {
 		log.Fatalf("%s", err)
 	}
