@@ -5,6 +5,10 @@ import (
 	"fmt"
 	"github.com/fourstring/sheetfs/master/config"
 	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	"github.com/fourstring/sheetfs/master/filemgr"
+	"github.com/fourstring/sheetfs/master/filemgr/mgr_entry"
+	"github.com/fourstring/sheetfs/master/journal/checkpoint"
+	"github.com/fourstring/sheetfs/master/sheetfile"
 	fs_rpc "github.com/fourstring/sheetfs/protocol"
 	"github.com/fourstring/sheetfs/tests"
 	. "github.com/smartystreets/goconvey/convey"
@@ -14,14 +18,15 @@ import (
 
 var ctx = goctx.Background()
 
-func newTestServer() (*server, error) {
-	db, err := tests.GetTestDB()
+func newTestServer() (*Server, error) {
+	db, err := tests.GetTestDB(&mgr_entry.MapEntry{}, &sheetfile.Chunk{}, &checkpoint.Checkpoint{})
 	if err != nil {
 		return nil, err
 	}
 	alloc := datanode_alloc.NewDataNodeAllocator()
 	alloc.AddDataNode("node1")
-	s, err := NewServer(db, alloc)
+	fm := filemgr.LoadFileManager(db, alloc, nil)
+	s, err := NewServer(fm, alloc)
 	if err != nil {
 		return nil, err
 	}
@@ -64,10 +69,11 @@ func shouldBeSameCell(actual interface{}, expected ...interface{}) string {
 
 func TestServer_RegisterDataNode(t *testing.T) {
 	Convey("Build test server", t, func() {
-		db, err := tests.GetTestDB()
+		db, err := tests.GetTestDB(&mgr_entry.MapEntry{}, &sheetfile.Chunk{}, &checkpoint.Checkpoint{})
 		So(err, ShouldBeNil)
 		alloc := datanode_alloc.NewDataNodeAllocator()
-		s, err := NewServer(db, alloc)
+		fm := filemgr.LoadFileManager(db, alloc, nil)
+		s, err := NewServer(fm, alloc)
 		So(err, ShouldBeNil)
 		Convey("Call rpc method", func() {
 			rep, err := s.RegisterDataNode(ctx, &fs_rpc.RegisterDataNodeRequest{Addr: "node1"})
@@ -120,7 +126,7 @@ func TestServer_ReadCell(t *testing.T) {
 					Chunk: &fs_rpc.Chunk{
 						Id:        1,
 						Datanode:  "node1",
-						Version:   1,
+						Version:   0,
 						HoldsMeta: true,
 					},
 					Offset: 0,
@@ -239,7 +245,7 @@ func TestServer_ReadSheet(t *testing.T) {
 							So(chunk, shouldBeSameChunk, &fs_rpc.Chunk{
 								Id:        1,
 								Datanode:  "node1",
-								Version:   1,
+								Version:   0,
 								HoldsMeta: true,
 							})
 						case 4:

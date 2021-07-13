@@ -3,7 +3,7 @@ package sheetfile
 import (
 	"github.com/fourstring/sheetfs/master/config"
 	"github.com/fourstring/sheetfs/master/datanode_alloc"
-	"github.com/fourstring/sheetfs/master/errors"
+	"github.com/fourstring/sheetfs/master/filemgr/file_errors"
 	"gorm.io/gorm"
 	"sync"
 )
@@ -62,7 +62,7 @@ the table here as a workaround.
 		*errors.NoDataNodeError: This function must allocate a Chunk for MetaCell, if there
 		are no DataNodes for storing this cell, returns NoDateNodeError.
 */
-func CreateSheetFile(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator, filename string) (*SheetFile, error) {
+func CreateSheetFile(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator, filename string) (*SheetFile, *Cell, *Chunk, error) {
 	f := &SheetFile{
 		Chunks:             map[uint64]*Chunk{},
 		Cells:              map[int64]*Cell{},
@@ -72,11 +72,11 @@ func CreateSheetFile(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator, filen
 	}
 	err := f.persistentStructure(db)
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	dataNode, err := alloc.AllocateNode()
 	if err != nil {
-		return nil, err
+		return nil, nil, nil, err
 	}
 	// Create Chunk and MetaCell
 	chunk := &Chunk{DataNode: dataNode, Version: 0}
@@ -86,7 +86,7 @@ func CreateSheetFile(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator, filen
 	// Add MetaCell and Chunk to new file
 	f.Chunks[chunk.ID] = chunk
 	f.Cells[metaCell.CellID] = metaCell
-	return f, nil
+	return f, metaCell, chunk, nil
 }
 
 /*
@@ -116,9 +116,9 @@ func LoadSheetFile(db *gorm.DB, alloc *datanode_alloc.DataNodeAllocator, filenam
 		alloc:    alloc,
 	}
 	for _, cell := range cells {
-		// sheetName is ignored by gorm, not persist to sqlite
+		// SheetName is ignored by gorm, not persist to sqlite
 		// However it's necessary to persist cell later
-		cell.sheetName = filename
+		cell.SheetName = filename
 		file.Cells[cell.CellID] = cell
 		_, ok := file.Chunks[cell.ChunkID]
 		// config.MaxCellsPerChunk cells will be stored in the same Chunk at most.
@@ -177,7 +177,7 @@ func (s *SheetFile) GetCellChunk(row, col uint32) (*Cell, *Chunk, error) {
 	// Compute CellID by row, col and lookup cell by CellID.
 	cell := s.Cells[GetCellID(row, col)]
 	if cell == nil {
-		return nil, nil, errors.NewCellNotFoundError(row, col)
+		return nil, nil, file_errors.NewCellNotFoundError(row, col)
 	}
 	return cell.Snapshot(), s.Chunks[cell.ChunkID].Snapshot(), nil
 }

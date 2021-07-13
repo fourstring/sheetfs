@@ -2,7 +2,6 @@ package datanode_alloc
 
 import (
 	"fmt"
-	"github.com/fourstring/sheetfs/master/errors"
 	. "github.com/smartystreets/goconvey/convey"
 	"sync"
 	"testing"
@@ -12,7 +11,7 @@ func TestDataNodeAllocation(t *testing.T) {
 	Convey("Test for allocate directly", t, func() {
 		alloc := NewDataNodeAllocator()
 		_, err := alloc.AllocateNode()
-		So(err, ShouldBeError, &errors.NoDataNodeError{})
+		So(err, ShouldBeError, &NoDataNodeError{})
 	})
 
 	Convey("Add some nodes", t, func() {

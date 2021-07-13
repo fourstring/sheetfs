@@ -1,7 +1,6 @@
 package datanode_alloc
 
 import (
-	"github.com/fourstring/sheetfs/master/errors"
 	"sync"
 )
 
@@ -18,9 +17,13 @@ type DataNodeAllocator struct {
 
 func NewDataNodeAllocator() *DataNodeAllocator {
 	return &DataNodeAllocator{
-		dataNodes:    []*dataNode{},
-		dataNodesSet: map[string]struct{}{},
-		curPos:       0,
+		dataNodes: []*dataNode{{
+			address: "node1",
+		}},
+		dataNodesSet: map[string]struct{}{
+			"node1": {},
+		},
+		curPos: 0,
 	}
 }
 
@@ -41,7 +44,7 @@ func (c *DataNodeAllocator) AllocateNode() (string, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if len(c.dataNodes) == 0 {
-		return "", &errors.NoDataNodeError{}
+		return "", &NoDataNodeError{}
 	}
 	node := c.dataNodes[c.curPos].address
 	c.curPos = (c.curPos + 1) % uint(len(c.dataNodes))

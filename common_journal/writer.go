@@ -110,8 +110,9 @@ Internally, we use a writer-preferred RWMutex here, to make Checkpoint operation
 CommitEntry, and all CommitEntry don't interfere with each other. PrepareCheckpoint will Lock this
 RWMutex, and CommitEntry will RLock it.
 */
-func (w *Writer) PrepareCheckpoint() {
+func (w *Writer) PrepareCheckpoint() int64 {
 	w.ckptMu.Lock()
+	return w.lastWriteOffset
 }
 
 /*
@@ -130,7 +131,6 @@ this offset can be used by the primary node to recover from journals after crash
 func (w *Writer) Checkpoint(ctx context.Context) (int64, error) {
 	// Fetch latest offset of entries
 	ckptOffset := w.lastWriteOffset + 1
-	fmt.Printf("%d\n", ckptOffset)
 	ckpt := Checkpoint{
 		LastEntryOffset: ckptOffset - 1, // when there is no message written, it can be -1
 		NextEntryOffset: ckptOffset + 1,
