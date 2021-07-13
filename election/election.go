@@ -26,8 +26,8 @@ NewElector
 Create an Elector instance and ensures that both of {electionZnode} and {electionAck} has been
 created. Caller has no need to create them manually.
 
-Elector helps the caller to engage the election by creating Ephermeral|Sequential Znode named
-as '{electionZnode}/{electionPrefix}', and when a primary winned the election, it should write
+Elector helps the caller to engage the election by creating Ephemeral|Sequential Znode named
+as '{electionZnode}/{electionPrefix}', and when a primary won the election, it should write
 its identify info(e.g address) to Znode '{electionAck}'.
 
 @param
@@ -87,7 +87,7 @@ func (e *Elector) CreateProposal() (string, error) {
 TryBeLeader
 Check all children Znode of electionZnode(or all proposals) with smaller suffix than
 proposal of called itself. Due to sequential guarantee of Zookeeper, a node always gain a
-consistent view of its proceding proposals. If the caller owns smallest proposal, than it is
+consistent view of its proceeding proposals. If the caller owns smallest proposal, than it is
 granted as primary, or it should turn into a secondary one, watching for its closest predecessor.
 When the latter crashed, its proposal will be deleted by Zookeeper according to Ephemeral flag,
 and this node is awaken. Caller should call this method again after that, to TryBeLeader.

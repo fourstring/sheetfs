@@ -4,8 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"github.com/fourstring/sheetfs/common_journal"
+	"github.com/fourstring/sheetfs/config"
+	"github.com/fourstring/sheetfs/datanode/journal"
 	"github.com/fourstring/sheetfs/datanode/utils"
 	fsrpc "github.com/fourstring/sheetfs/protocol"
+	"hash/crc32"
 	"io/fs"
 	"os"
 	"path"
@@ -15,11 +19,13 @@ import (
 type server struct {
 	fsrpc.UnimplementedDataNodeServer
 	dataPath string
+	writer   *common_journal.Writer
 }
 
-func NewServer(path string) *server {
+func NewServer(path string, writer *common_journal.Writer) *server {
 	return &server{
 		dataPath: path,
+		writer:   writer,
 	}
 }
 
@@ -71,6 +77,16 @@ func (s *server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 }
 
 func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkRequest) (*fsrpc.WriteChunkReply, error) {
+	/* TODO: First write log to Kafka */
+	entry := journal.ConstructEntry(request)
+	for {
+		err := s.writer.CommitEntry(ctx, entry)
+		if err == nil {
+			break
+		}
+	}
+
+	/* Write to disk */
 	reply := new(fsrpc.WriteChunkReply)
 
 	file, err := os.OpenFile(s.getFilename(request.Id), os.O_RDWR, 0755)
@@ -135,4 +151,52 @@ func (s *server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 
 func (s *server) getFilename(id uint64) string {
 	return path.Join(s.dataPath, "chunk_"+strconv.FormatUint(id, 10))
+}
+
+func (s *server) HandleMsg(msg []byte, checkpoint *common_journal.Checkpoint) {
+	// TODO: secondary handle message from kafka
+	version := utils.BytesToUint64(msg[0:8])
+	chunkid := utils.BytesToUint64(msg[8:16])
+	offset := utils.BytesToUint64(msg[16:24])
+	size := utils.BytesToUint64(msg[24:32])
+
+	// try to open the file
+	file, err := os.OpenFile(s.getFilename(chunkid), os.O_RDWR, 0755)
+
+	// this file does not exist
+	if err != nil {
+		// create the file and write data
+		for {
+			file, err = os.Create(s.getFilename(chunkid))
+			if err == nil {
+				break
+			}
+		}
+		for {
+			_, err = file.WriteAt(msg[36:], int64(offset))
+			if err == nil {
+				break
+			}
+		}
+
+		// the version is newest
+		utils.SyncAndUpdateVersion(file, version)
+	}
+
+	// the file already exist
+	// check the checksum first
+	oldData := make([]byte, size)
+	file.ReadAt(oldData, int64(offset))
+	dataCks := crc32.Checksum(oldData, config.Crc32q)
+
+	// if they have different checksum
+	if utils.BytesToUint32(msg[32:36]) != dataCks {
+		// overwrite
+		for {
+			_, err = file.WriteAt(msg[36:], int64(offset))
+			if err == nil {
+				break
+			}
+		}
+	}
 }

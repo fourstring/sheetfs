@@ -9,14 +9,24 @@ import (
 
 /* private functions */
 
-func uint64ToBytes(i uint64) []byte {
+func Uint64ToBytes(i uint64) []byte {
 	var buf = make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, i)
 	return buf
 }
 
-func bytesToUint64(buf []byte) uint64 {
+func BytesToUint64(buf []byte) uint64 {
 	return binary.BigEndian.Uint64(buf)
+}
+
+func Uint32ToBytes(i uint32) []byte {
+	var buf = make([]byte, 4)
+	binary.BigEndian.PutUint32(buf, i)
+	return buf
+}
+
+func BytesToUint32(buf []byte) uint32 {
+	return binary.BigEndian.Uint32(buf)
 }
 
 func GetPaddedData(data []byte, size uint64, padding string) []byte {
@@ -53,7 +63,7 @@ func GetPaddedFile(data []byte, size uint64, padding string, offset uint64) []by
 
 func SyncAndUpdateVersion(file *os.File, version uint64) {
 	//file.Sync()
-	data := uint64ToBytes(version)
+	data := Uint64ToBytes(version)
 	file.WriteAt(data, config.VERSION_START_LOCATION)
 	//file.Sync()
 	file.Close()
@@ -62,5 +72,5 @@ func SyncAndUpdateVersion(file *os.File, version uint64) {
 func GetVersion(file *os.File) uint64 {
 	buf := make([]byte, 8)
 	file.ReadAt(buf, config.VERSION_START_LOCATION)
-	return bytesToUint64(buf)
+	return BytesToUint64(buf)
 }
