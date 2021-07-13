@@ -10,6 +10,7 @@ import (
 	"github.com/fourstring/sheetfs/datanode/server"
 	"github.com/fourstring/sheetfs/election"
 	fsrpc "github.com/fourstring/sheetfs/protocol"
+	"github.com/go-zookeeper/zk"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -29,6 +30,7 @@ var nextEntryOffset = flag.Int64("o", 0, "offset of next entry to be consumed")
 var electionZnode = "/datanode_election"
 var electionPrefix = "4da1fce7-d3f8-42dd-965d-4c3311661202-n_"
 var electionAck = "/datanode_election_ack"
+var masterAck = "/master-ack"
 
 func main() {
 	flag.Parse()
@@ -124,7 +126,19 @@ func main() {
 	ser := grpc.NewServer()
 	fsrpc.RegisterDataNodeServer(ser, s)
 
-	var masterClient fsrpc.MasterNodeClient // TODO: ask what to get master node
+	// TODO: ask what to get master node
+	servers := strings.Split(*masterZnode, ";")
+	connect, _, err := zk.Connect(servers, 1*time.Second)
+	if err != nil {
+		log.Fatalf("Connect masternode server failed.")
+	}
+	masterAddr, _, err := connect.Get(masterAck)
+	if err != nil {
+		log.Fatalf("Get master address from commection failed.")
+	}
+	conn, _ := grpc.Dial(string(masterAddr))
+	var masterClient = fsrpc.NewMasterNodeClient(conn)
+
 	rep, err := masterClient.RegisterDataNode(context.Background(), &fsrpc.RegisterDataNodeRequest{Addr: *proposerId})
 	if err != nil {
 		log.Fatalf("%s", err)
