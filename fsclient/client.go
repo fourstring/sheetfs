@@ -2,7 +2,9 @@ package fsclient
 
 import (
 	"context"
+	"github.com/fourstring/sheetfs/config"
 	fsrpc "github.com/fourstring/sheetfs/protocol"
+	"github.com/go-zookeeper/zk"
 	"google.golang.org/grpc"
 	"io/fs"
 	"log"
@@ -49,6 +51,21 @@ func (c *Client) Create(ctx context.Context, name string) (f *File, err error) {
 	reply, err := c.masterClient.CreateSheet(ctx, &req)
 
 	if err != nil {
+		// ask ZK to get correct master
+		for i := 0; i < config.ACK_MOST_TIMES; i++ {
+			err := c.reAskMasterNode()
+			if err != nil {
+				continue
+			}
+			reply, err = c.masterClient.CreateSheet(ctx, &req)
+			if err != nil {
+				continue
+			}
+			break // now get the correct reply
+		}
+	}
+	// still have errors
+	if reply == nil || err != nil {
 		return nil, err
 	}
 
@@ -77,8 +94,24 @@ func (c *Client) Delete(ctx context.Context, name string) (err error) {
 	reply, err := c.masterClient.DeleteSheet(ctx, &req)
 
 	if err != nil {
+		// ask ZK to get correct master
+		for i := 0; i < config.ACK_MOST_TIMES; i++ {
+			err := c.reAskMasterNode()
+			if err != nil {
+				continue
+			}
+			reply, err = c.masterClient.DeleteSheet(ctx, &req)
+			if err != nil {
+				continue
+			}
+			break // now get the correct reply
+		}
+	}
+	// still have errors
+	if reply == nil || err != nil {
 		return err
 	}
+
 	switch reply.Status {
 	case fsrpc.Status_OK:
 		return nil
@@ -109,6 +142,22 @@ func (c *Client) Open(ctx context.Context, name string) (f *File, err error) {
 	reply, err := c.masterClient.OpenSheet(ctx, &req)
 
 	if err != nil {
+		// ask ZK to get correct master
+		for i := 0; i < config.ACK_MOST_TIMES; i++ {
+			err := c.reAskMasterNode()
+			if err != nil {
+				continue
+			}
+			reply, err = c.masterClient.OpenSheet(ctx, &req)
+			if err != nil {
+				continue
+			}
+			break // now get the correct reply
+		}
+	}
+
+	// still have errors
+	if reply == nil || err != nil {
 		return nil, err
 	}
 
@@ -141,39 +190,6 @@ func (c *Client) checkNewDataNode(chunks []*fsrpc.Chunk) {
 }
 
 func (c *Client) concurrentReadChunk(ctx context.Context, chunk *fsrpc.Chunk, in *fsrpc.ReadChunkRequest, opts ...grpc.CallOption) (*fsrpc.ReadChunkReply, error) {
-	/*var wg sync.WaitGroup
-
-	// reply map
-	// replyMap := make(map[string] []byte)
-	replyMap := make(map[string]*fsrpc.ReadChunkReply)
-
-	// Concurrent ReadChunk for each in map
-	for name, client := range g.datanodeClientMap {
-		wg.Add(1)
-
-		// start a new goroutine
-		client := client
-		name := name
-		go func() {
-			// get the whole chunk data
-			reply, err := client.ReadChunk(ctx, in, opts...)
-			if err != nil || reply.Status != fsrpc.Status_OK {
-				defer wg.Done()
-				return
-			}
-			replyMap[name] = reply
-
-			defer wg.Done()
-		}()
-	}
-	// wait for all tasks finish
-	wg.Wait()
-
-	for _, data := range replyMap {
-		return data, nil
-	}
-	return nil, errors.New("no data")
-	*/
 	var dc fsrpc.DataNodeClient
 	c.mu.RLock()
 	for addr, client := range c.datanodeClientMap {
@@ -184,39 +200,35 @@ func (c *Client) concurrentReadChunk(ctx context.Context, chunk *fsrpc.Chunk, in
 		}
 	}
 	c.mu.RUnlock()
-	return dc.ReadChunk(ctx, in, opts...)
+
+	reply, err := dc.ReadChunk(ctx, in, opts...)
+
+	// current datanode address can not serve
+	if err != nil {
+		goto ask
+	}
+
+	return reply, nil
+
+ask:
+	// ask the right address, at most ACK_MOST_TIMES
+	for i := 0; i < config.ACK_MOST_TIMES; i++ {
+		client, err := c.reAskDataNode(chunk.Datanode)
+		if err != nil {
+			continue
+		}
+		reply, err = client.ReadChunk(ctx, in, opts...)
+		if err != nil {
+			continue
+		}
+		// now get the correct reply
+		return reply, nil
+	}
+
+	return nil, err
 }
 
 func (c *Client) concurrentWriteChunk(ctx context.Context, chunk *fsrpc.Chunk, in *fsrpc.WriteChunkRequest, opts ...grpc.CallOption) (*fsrpc.WriteChunkReply, error) {
-	/*
-		var wg sync.WaitGroup
-		wg.Add(1)
-
-		// reply map
-		replyMap := make(map[string]*fsrpc.WriteChunkReply)
-
-		// Concurrent ReadChunk for each in map
-		for name, client := range g.datanodeClientMap {
-			// start a new goroutine
-			go func() {
-				// get the whole chunk data
-				reply, err := client.WriteChunk(ctx, in, opts...)
-				if err != nil {
-					return
-				}
-				replyMap[name] = reply
-
-				defer wg.Done()
-			}()
-		}
-		// wait for all tasks finish
-		wg.Wait()
-
-		for _, data := range replyMap {
-			return data, nil
-		}
-		return nil, errors.New("no data")
-	*/
 	var dc fsrpc.DataNodeClient
 	c.mu.RLock()
 	for addr, client := range c.datanodeClientMap {
@@ -227,5 +239,67 @@ func (c *Client) concurrentWriteChunk(ctx context.Context, chunk *fsrpc.Chunk, i
 		}
 	}
 	c.mu.RUnlock()
-	return dc.WriteChunk(ctx, in, opts...)
+
+	reply, err := dc.WriteChunk(ctx, in, opts...)
+
+	// current datanode address can not serve
+	if err != nil {
+		goto ask
+	}
+
+	return reply, nil
+
+ask:
+	// ask the right address, at most ACK_MOST_TIMES
+	for i := 0; i < config.ACK_MOST_TIMES; i++ {
+		client, err := c.reAskDataNode(chunk.Datanode)
+		if err != nil {
+			continue
+		}
+		reply, err = client.WriteChunk(ctx, in, opts...)
+		if err != nil {
+			continue
+		}
+		// now get the correct reply
+		return reply, nil
+	}
+
+	return nil, err
+}
+
+func (c *Client) reAskMasterNode() error {
+	connZK, _, err := zk.Connect(config.ElectionServer, config.AckTimeout)
+	if err != nil { // retry
+		return err
+	}
+	masterAddr, _, err := connZK.Get(config.MasterAck)
+	if err != nil { // retry
+		return err
+	}
+	conn, err := grpc.Dial(string(masterAddr), grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil {
+		return err
+	}
+	c.masterClient = fsrpc.NewMasterNodeClient(conn)
+	return nil
+}
+
+func (c *Client) reAskDataNode(datanode string) (fsrpc.DataNodeClient, error) {
+	connZK, _, err := zk.Connect(config.ElectionServer, config.AckTimeout)
+	if err != nil { // retry
+		return nil, err
+	}
+	datanodeAddr, _, err := connZK.Get(config.DataNodeAckPrefix + datanode)
+	if err != nil { // retry
+		return nil, err
+	}
+	// connect
+	conn, err := grpc.Dial(string(datanodeAddr), grpc.WithInsecure(), grpc.WithBlock())
+	if err != nil { // retry
+		return nil, err
+	}
+	client := fsrpc.NewDataNodeClient(conn)
+	c.datanodeClientMap[string(datanodeAddr)] = client
+
+	return client, nil
 }
