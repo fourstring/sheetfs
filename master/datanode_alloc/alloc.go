@@ -17,13 +17,24 @@ type DataNodeAllocator struct {
 
 func NewDataNodeAllocator() *DataNodeAllocator {
 	return &DataNodeAllocator{
-		dataNodes: []*dataNode{{
-			address: "node1",
-		}},
-		dataNodesSet: map[string]struct{}{
-			"node1": {},
-		},
-		curPos: 0,
+		dataNodes:    []*dataNode{{}},
+		dataNodesSet: map[string]struct{}{},
+		curPos:       0,
+	}
+}
+
+func NewDataNodeAllocatorWithGroups(dataNodeGroups []string) *DataNodeAllocator {
+	dataNodes := make([]*dataNode, 0)
+	dataNodeSet := map[string]struct{}{}
+	for _, group := range dataNodeGroups {
+		dataNodes = append(dataNodes, &dataNode{address: group})
+		dataNodeSet[group] = struct{}{}
+	}
+
+	return &DataNodeAllocator{
+		dataNodes:    dataNodes,
+		dataNodesSet: dataNodeSet,
+		curPos:       0,
 	}
 }
 
