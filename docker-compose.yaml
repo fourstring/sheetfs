@@ -1,16 +1,63 @@
 version: "3"
 
 services:
-  master:
+  master1:
     build:
       dockerfile: "./master.Dockerfile"
       context: "."
     ports:
       - 8432:8432
     environment:
-      MASTER_ADDR: "master:8432"
+      MASTER_ADDR_FOR_CLIENT: "127.0.0.1:8432"
+      DATANODE_GROUPS:
+      ELECTION_ACK: /master-ack
+      ELECTION_ZNODE: /master-election
+      NODE_ID: master1
+      KAFKA_SERVER: kafka:9093
+      KAFKA_TOPIC: master-journal
+      MASTER_PORT: 8432
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
     networks:
       - sheetfs
+
+  master2:
+    build:
+      dockerfile: "./master.Dockerfile"
+      context: "."
+    ports:
+      - 8433:8432
+    environment:
+      MASTER_ADDR_FOR_CLIENT: "127.0.0.1:8433"
+      DATANODE_GROUPS:
+      ELECTION_ACK: /master-ack
+      ELECTION_ZNODE: /master-election
+      NODE_ID: master2
+      KAFKA_SERVER: kafka:9093
+      KAFKA_TOPIC: master-journal
+      MASTER_PORT: 8432
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+    networks:
+      - sheetfs
+
+  master3:
+    build:
+      dockerfile: "./master.Dockerfile"
+      context: "."
+    ports:
+      - 8434:8432
+    environment:
+      MASTER_ADDR_FOR_CLIENT: "127.0.0.1:8434"
+      DATANODE_GROUPS:
+      ELECTION_ACK: /master-ack
+      ELECTION_ZNODE: /master-election
+      NODE_ID: master3
+      KAFKA_SERVER: kafka:9093
+      KAFKA_TOPIC: master-journal
+      MASTER_PORT: 8432
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+    networks:
+      - sheetfs
+
   datanode1:
     build:
       dockerfile: "./datanode.Dockerfile"
@@ -45,6 +92,63 @@ services:
       MASTER_ADDR: "master:8432"
       DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9377"
       DATANODE_PORT: "9375"
+    networks:
+      - sheetfs
+
+  zoo1:
+    image: zookeeper
+    restart: always
+    hostname: zoo1
+    ports:
+      - 2181:2181
+    environment:
+      ZOO_MY_ID: 1
+      ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+    networks:
+      - sheetfs
+
+  zoo2:
+    image: zookeeper
+    restart: always
+    hostname: zoo2
+    ports:
+      - 2182:2181
+    environment:
+      ZOO_MY_ID: 2
+      ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+    networks:
+      - sheetfs
+
+  zoo3:
+    image: zookeeper
+    restart: always
+    hostname: zoo3
+    ports:
+      - 2183:2181
+    environment:
+      ZOO_MY_ID: 3
+      ZOO_SERVERS: server.1=zoo1:2888:3888;2181 server.2=zoo2:2888:3888;2181 server.3=zoo3:2888:3888;2181
+    networks:
+      - sheetfs
+
+  kafka:
+    image: docker.io/bitnami/kafka:2
+    ports:
+      - "9092:9092"
+      - "9093:9093"
+    environment:
+      KAFKA_CFG_ZOOKEEPER_CONNECT: zoo1:2181,zoo2:2181,zoo3:2181
+      ALLOW_PLAINTEXT_LISTENER: 'yes'
+      KAFKA_CFG_AUTO_CREATE_TOPICS_ENABLE: 'true'
+      KAFKA_CFG_NUM_PARTITIONS: 1
+      KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
+      KAFKA_CFG_LISTENERS: CLIENT://:9092,EXTERNAL://:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      KAFKA_INTER_BROKER_LISTENER_NAME: CLIENT
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
     networks:
       - sheetfs
 
