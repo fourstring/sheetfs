@@ -7,8 +7,9 @@ import (
 	"hash/crc32"
 )
 
-func ConstructEntry(request *fsrpc.WriteChunkRequest) []byte {
+func ConstructWriteEntry(request *fsrpc.WriteChunkRequest) []byte {
 	var entry []byte
+	entry = append(entry, utils.Uint64ToBytes(config.WRITE_LOG_FLAG)...)
 	entry = append(entry, utils.Uint64ToBytes(request.Version)...)
 	entry = append(entry, utils.Uint64ToBytes(request.Id)...)
 	entry = append(entry, utils.Uint64ToBytes(request.Offset)...)
@@ -16,5 +17,12 @@ func ConstructEntry(request *fsrpc.WriteChunkRequest) []byte {
 	checksum := crc32.Checksum(request.Data, config.Crc32q)
 	entry = append(entry, utils.Uint32ToBytes(checksum)...)
 	entry = append(entry, request.Data...)
+	return entry
+}
+
+func ConstructDeleteEntry(request *fsrpc.DeleteChunkRequest) []byte {
+	var entry []byte
+	entry = append(entry, utils.Uint64ToBytes(config.DELETE_LOG_FLAG)...)
+	entry = append(entry, utils.Uint64ToBytes(request.Id)...)
 	return entry
 }

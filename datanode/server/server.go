@@ -23,6 +23,11 @@ type Server struct {
 }
 
 func NewServer(path string, writer *common_journal.Writer) *Server {
+	fmt.Printf("start a new server with path %s\n", path)
+	err := os.MkdirAll(path, 0777)
+	if err != nil {
+		fmt.Printf("server with path %s mkdir fail\n", path)
+	}
 	return &Server{
 		dataPath: path,
 		writer:   writer,
@@ -31,11 +36,27 @@ func NewServer(path string, writer *common_journal.Writer) *Server {
 
 func (s *Server) DeleteChunk(ctx context.Context, request *fsrpc.DeleteChunkRequest) (*fsrpc.DeleteChunkReply, error) {
 	reply := new(fsrpc.DeleteChunkReply)
-	reply.Status = fsrpc.Status_OK
-	err := os.Remove(s.getFilename(request.Id))
+	var err error
+
+	/* TODO: First write log to Kafka */
+	entry := journal.ConstructDeleteEntry(request)
+	for i := 0; i < config.ACK_MOST_TIMES; i++ {
+		err = s.writer.CommitEntry(ctx, entry)
+		if err == nil {
+			break
+		}
+	}
+	if err != nil { // write to kafka fail
+		reply.Status = fsrpc.Status_Unavailable
+		fmt.Println(err)
+		return reply, nil
+	}
+
+	err = os.Remove(s.getFilename(request.Id))
 	if err != nil {
 		print("not delete")
 	}
+	reply.Status = fsrpc.Status_OK
 	return reply, nil
 }
 
@@ -77,17 +98,22 @@ func (s *Server) ReadChunk(ctx context.Context, request *fsrpc.ReadChunkRequest)
 }
 
 func (s *Server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkRequest) (*fsrpc.WriteChunkReply, error) {
+	reply := new(fsrpc.WriteChunkReply)
+	var err error
+
 	/* TODO: First write log to Kafka */
-	entry := journal.ConstructEntry(request)
-	for {
-		err := s.writer.CommitEntry(ctx, entry)
+	entry := journal.ConstructWriteEntry(request)
+	for i := 0; i < config.ACK_MOST_TIMES; i++ {
+		err = s.writer.CommitEntry(ctx, entry)
 		if err == nil {
 			break
 		}
 	}
-
-	/* Write to disk */
-	reply := new(fsrpc.WriteChunkReply)
+	if err != nil { // write to kafka fail
+		reply.Status = fsrpc.Status_Unavailable
+		fmt.Println(err)
+		return reply, nil
+	}
 
 	file, err := os.OpenFile(s.getFilename(request.Id), os.O_RDWR, 0755)
 
@@ -153,8 +179,7 @@ func (s *Server) getFilename(id uint64) string {
 	return path.Join(s.dataPath, "chunk_"+strconv.FormatUint(id, 10))
 }
 
-func (s *Server) HandleMsg(msg []byte) error {
-	// TODO: secondary handle message from kafka
+func (s *Server) HandleWriteMsg(msg []byte) error {
 	version := utils.BytesToUint64(msg[0:8])
 	chunkid := utils.BytesToUint64(msg[8:16])
 	offset := utils.BytesToUint64(msg[16:24])
@@ -203,4 +228,28 @@ func (s *Server) HandleMsg(msg []byte) error {
 		}
 	}
 	return nil
+}
+
+func (s *Server) HandleDeleteMsg(msg []byte) error {
+	chunkid := utils.BytesToUint64(msg[0:8])
+	err := os.Remove(s.getFilename(chunkid))
+	if err != nil {
+		fmt.Println("handle delete log: no such file")
+	}
+	fmt.Println("handle delete log: successfully remove file")
+	return nil
+}
+
+func (s *Server) HandleMsg(msg []byte) error {
+	// TODO: secondary handle message from kafka
+	logType := utils.BytesToUint64(msg[0:8])
+
+	switch logType {
+	case config.WRITE_LOG_FLAG:
+		return s.HandleWriteMsg(msg[8:])
+	case config.DELETE_LOG_FLAG:
+		return s.HandleDeleteMsg(msg[8:])
+	default:
+		return nil
+	}
 }

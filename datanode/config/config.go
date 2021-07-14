@@ -5,6 +5,8 @@ import (
 )
 
 const (
+	BLOCK_SIZE          = 2 << 10
+	DIR_DATA_PATH       = "../data/"
 	ElectionZnodePrefix = "/datanode_election_"
 	ElectionAckPrefix   = "/datanode_election_ack_"
 	MasterAck           = "/master_election_ack"

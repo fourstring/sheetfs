@@ -1,9 +1,12 @@
 package node
 
 import (
+	stdctx "context"
 	"errors"
 	"fmt"
 	"github.com/fourstring/sheetfs/datanode/config"
+	"github.com/fourstring/sheetfs/datanode/server"
+	fs_rpc "github.com/fourstring/sheetfs/protocol"
 	"github.com/go-zookeeper/zk"
 	. "github.com/smartystreets/goconvey/convey"
 	"log"
@@ -16,11 +19,16 @@ type testNode struct {
 	cfg  *DataNodeConfig
 }
 
+func (t *testNode) RPC() *server.Server {
+	return t.node.rpcsrv
+}
+
 func newTestNode(id string, port uint, caddr string, name string) (*testNode, error) {
 	cfg := &DataNodeConfig{
 		NodeID:           id,
 		Port:             port,
 		ForClientAddr:    caddr,
+		DataDirPath:      config.DIR_DATA_PATH,
 		ZookeeperServers: config.ElectionServers,
 		ZookeeperTimeout: config.ElectionTimeout,
 		ElectionZnode:    config.ElectionZnodePrefix + name,
@@ -46,7 +54,7 @@ func newTestNodesSet(startPort uint, num int) (map[string]*testNode, error) {
 	set := map[string]*testNode{}
 	for i := 0; i < num; i++ {
 		port := startPort + uint(i)
-		id := fmt.Sprintf("mnode%d", i)
+		id := fmt.Sprintf("dnode%d", i)
 		caddr := fmt.Sprintf("127.0.0.1:%d", port)
 		n, err := newTestNode(id, port, caddr, "node1")
 		if err != nil {
@@ -82,13 +90,63 @@ func checkPrimaryNode(conn *zk.Conn, nodes map[string]*testNode, ackName string,
 	return primary, secondaries, nil
 }
 
+func populatePrimary(primary *testNode, id uint64, offset uint64, version uint64, data []byte) {
+
+	_, err := primary.RPC().DeleteChunk(stdctx.Background(), &fs_rpc.DeleteChunkRequest{
+		Id: id,
+	})
+	So(err, ShouldBeNil)
+
+	time.Sleep(1 * time.Second) // wait for journal replication
+	rep, err := primary.RPC().WriteChunk(stdctx.Background(), &fs_rpc.WriteChunkRequest{
+		Id:      id,
+		Offset:  offset,
+		Padding: " ",
+		Size:    config.BLOCK_SIZE,
+		Version: version,
+		Data:    data,
+	})
+	So(err, ShouldBeNil)
+	So(rep.Status, ShouldEqual, fs_rpc.Status_OK)
+}
+
+func verifySecondary(secondary *testNode, id uint64, offset uint64, version uint64, data []byte) {
+	rep, err := secondary.RPC().ReadChunk(stdctx.Background(), &fs_rpc.ReadChunkRequest{
+		Id:      id,
+		Offset:  offset,
+		Size:    config.BLOCK_SIZE,
+		Version: version + 1,
+	})
+	So(err, ShouldBeNil)
+	So(rep.Status, ShouldEqual, fs_rpc.Status_OK)
+	So(rep.Data[:len(data)], ShouldResemble, data)
+}
+
 func TestDataNodeReplication(t *testing.T) {
+	chunkId := uint64(1)
+	offset := uint64(0)
+	version := uint64(1) // first version return by master should be 1
+	data := []byte("this is the test data.")
+
 	Convey("Construct test nodes", t, func() {
+		// construct node set
 		nodesSet, err := newTestNodesSet(9375, 3)
 		So(err, ShouldBeNil)
+
+		// connect to servers
 		zkConn, _, err := zk.Connect(config.ElectionServers, config.ElectionTimeout)
 		So(err, ShouldBeNil)
-		_, _, err = checkPrimaryNode(zkConn, nodesSet, config.ElectionAckPrefix+"node1", 20)
+
+		// get the primary node and secondary node list
+		primary, secondaries, err := checkPrimaryNode(zkConn, nodesSet, config.ElectionAckPrefix+"node1", 20)
 		So(err, ShouldBeNil)
+		log.Printf("Select primary: %s\n", primary.cfg.NodeID)
+
+		// write a chunk in primary and check secondary
+		populatePrimary(primary, chunkId, offset, version, data)
+		time.Sleep(1 * time.Second) // wait for journal replication
+		for _, secondary := range secondaries {
+			verifySecondary(secondary, chunkId, offset, version, data)
+		}
 	})
 }

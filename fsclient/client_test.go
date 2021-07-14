@@ -3,8 +3,10 @@ package fsclient
 import (
 	stdctx "context"
 	"fmt"
+	"github.com/fourstring/sheetfs/common_journal"
 	datanodeServer "github.com/fourstring/sheetfs/datanode/server"
 	"github.com/fourstring/sheetfs/master/datanode_alloc"
+	"github.com/fourstring/sheetfs/master/filemgr"
 	masternodeServer "github.com/fourstring/sheetfs/master/server"
 	fs_rpc "github.com/fourstring/sheetfs/protocol"
 	"github.com/fourstring/sheetfs/tests"
@@ -124,12 +126,13 @@ func startNodes(dataNodeCnt int) (*servers, error) {
 			continue
 		}
 		// Listen to port successfully, initialize MasterNode
-		db, err := tests.GetTestDB()
-		if err != nil {
-			return s, err
-		}
+		//db, err := tests.GetTestDB()
+		//if err != nil {
+		//	return s, err
+		//}
 		alloc := datanode_alloc.NewDataNodeAllocator()
-		ms, err := masternodeServer.NewServer(db, alloc)
+		fm := &filemgr.FileManager{} // FIXME: Just for fix bug
+		ms, err := masternodeServer.NewServer(fm, alloc)
 		if err != nil {
 			return s, err
 		}
@@ -163,7 +166,8 @@ func startNodes(dataNodeCnt int) (*servers, error) {
 			if err != nil {
 				return s, err
 			}
-			ds := datanodeServer.NewServer(chunksDirPath)
+			jw := &common_journal.Writer{} // FIXME: Just for fix bug
+			ds := datanodeServer.NewServer(chunksDirPath, jw)
 			dn := newDatanode(datanodeAddr, grpc.NewServer())
 			fs_rpc.RegisterDataNodeServer(dn.srv, ds)
 			s.DataNodes = append(s.DataNodes, dn)

@@ -18,6 +18,7 @@ type DataNodeConfig struct {
 	NodeID           string
 	Port             uint
 	ForClientAddr    string
+	DataDirPath      string
 	ZookeeperServers []string
 	ZookeeperTimeout time.Duration
 	ElectionZnode    string
@@ -58,6 +59,9 @@ func NewDataNode(config *DataNodeConfig) (*DataNode, error) {
 		return nil, err
 	}
 	d.receiver = receiver
+
+	rpcsrv := server.NewServer(config.DataDirPath+config.NodeID, jw)
+	d.rpcsrv = rpcsrv
 
 	return d, nil
 }
@@ -118,11 +122,9 @@ func (d *DataNode) RunAsPrimary() error {
 	if err != nil {
 		return err
 	}
-	srv := server.NewServer(d.cAddr, d.jWriter)
 
-	d.rpcsrv = srv
 	s := grpc.NewServer()
-	fs_rpc.RegisterDataNodeServer(s, srv)
+	fs_rpc.RegisterDataNodeServer(s, d.rpcsrv)
 
 	// ABANDONED NOW: register data node
 	/*

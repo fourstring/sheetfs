@@ -14,6 +14,8 @@ const (
 	MasterAck              = "/master_election_ack"
 	AckTimeout             = 1 * time.Second
 	ACK_MOST_TIMES         = 5
+	WRITE_LOG_FLAG         = uint64(1)
+	DELETE_LOG_FLAG        = uint64(2)
 )
 
 var ElectionServer = []string{
