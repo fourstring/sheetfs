@@ -5,11 +5,9 @@ import (
 	"errors"
 	"fmt"
 	"github.com/fourstring/sheetfs/common_journal"
-	"github.com/fourstring/sheetfs/datanode/config"
 	"github.com/fourstring/sheetfs/datanode/server"
 	"github.com/fourstring/sheetfs/election"
 	fs_rpc "github.com/fourstring/sheetfs/protocol"
-	"github.com/go-zookeeper/zk"
 	"google.golang.org/grpc"
 	"log"
 	"net"
@@ -115,42 +113,44 @@ func (d *DataNode) RunAsSecondary() error {
 	return nil
 }
 
-func (m *DataNode) RunAsPrimary() error {
-	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", m.port))
+func (d *DataNode) RunAsPrimary() error {
+	lis, err := net.Listen("tcp", fmt.Sprintf(":%d", d.port))
 	if err != nil {
 		return err
 	}
-	srv := server.NewServer(m.cAddr, m.jWriter)
+	srv := server.NewServer(d.cAddr, d.jWriter)
 
-	m.rpcsrv = srv
+	d.rpcsrv = srv
 	s := grpc.NewServer()
 	fs_rpc.RegisterDataNodeServer(s, srv)
 
-	// register data node
-	connZK, _, err := zk.Connect(config.ElectionServers, config.ElectionTimeout)
-	if err != nil {
-		log.Fatalf("Connect masternode server failed.")
-	}
+	// ABANDONED NOW: register data node
+	/*
+		connZK, _, err := zk.Connect(config.ElectionServers, config.ElectionTimeout)
+		if err != nil {
+			log.Fatalf("Connect masternode server failed.")
+		}
 
-	masterAddr, _, err := connZK.Get(config.MasterAck)
-	if err != nil {
-		log.Fatalf("Get master address from commection failed.")
-	}
+		masterAddr, _, err := connZK.Get(config.MasterAck)
+		if err != nil {
+			log.Fatalf("Get master address from commection failed.")
+		}
 
-	connDial, _ := grpc.Dial(string(masterAddr))
-	var masterClient = fs_rpc.NewMasterNodeClient(connDial)
+		connDial, _ := grpc.Dial(string(masterAddr))
+		var masterClient = fs_rpc.NewMasterNodeClient(connDial)
 
-	rep, err := masterClient.RegisterDataNode(context.Background(),
-		&fs_rpc.RegisterDataNodeRequest{Addr: m.cAddr})
-	if err != nil {
-		log.Fatalf("%s", err)
-	}
-	if rep.Status != fs_rpc.Status_OK {
-		log.Fatalf("Register failed.")
-	}
+		rep, err := masterClient.RegisterDataNode(context.Background(),
+			&fs_rpc.RegisterDataNodeRequest{Addr: d.cAddr})
+		if err != nil {
+			log.Fatalf("%s", err)
+		}
+		if rep.Status != fs_rpc.Status_OK {
+			log.Fatalf("Register failed.")
+		}
+	*/
 
 	// ack leader
-	err = m.elector.AckLeader(m.cAddr)
+	err = d.elector.AckLeader(d.cAddr)
 	if err != nil {
 		return err
 	}
