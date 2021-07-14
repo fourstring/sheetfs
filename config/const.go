@@ -1,11 +1,26 @@
 package config
 
-import "hash/crc32"
+import (
+	"hash/crc32"
+	"time"
+)
 
-const FILE_LOCATION = "../data/"
-const BLOCK_SIZE = 2 << 10
-const FILE_SIZE = BLOCK_SIZE << 2
-const VERSION_START_LOCATION = BLOCK_SIZE << 2
-const SPECIAL_ID = ^uint64(0)
+const (
+	BLOCK_SIZE             = 2 << 10
+	FILE_SIZE              = BLOCK_SIZE << 2
+	VERSION_START_LOCATION = BLOCK_SIZE << 2
+	SPECIAL_ID             = ^uint64(0)
+	DataNodeAckPrefix      = "/datanode_election_ack_"
+	MasterAck              = "/master_election_ack"
+	AckTimeout             = 1 * time.Second
+	ACK_MOST_TIMES         = 5
+)
 
+var ElectionServer = []string{
+	"127.0.0.1:2181",
+	"127.0.0.1:2182",
+	"127.0.0.1:2183",
+}
+var KafkaServer = "127.0.0.1:9093"
+var KafkaTopicPrefix = "datanode_journal_"
 var Crc32q = crc32.MakeTable(0xD5828281)

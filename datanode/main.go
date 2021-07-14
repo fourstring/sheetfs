@@ -10,6 +10,7 @@ import (
 var port = flag.Uint("p", 0, "port to listen on")
 var forClientAddress = flag.String("a", "", "address for client to connect to this node")
 var nodeId = flag.String("i", "", "ID of this node")
+var nodeName = flag.String("n", "", "name of this node, e.g node1")
 
 func main() {
 	flag.Parse()
@@ -20,11 +21,11 @@ func main() {
 		ForClientAddr:    *forClientAddress,
 		ZookeeperServers: config.ElectionServers,
 		ZookeeperTimeout: config.ElectionTimeout,
-		ElectionZnode:    config.ElectionZnode,
+		ElectionZnode:    config.ElectionZnodePrefix + *nodeName,
 		ElectionPrefix:   config.ElectionPrefix,
-		ElectionAck:      config.ElectionAck,
+		ElectionAck:      config.ElectionAckPrefix + *nodeName,
 		KafkaServer:      config.KafkaServer,
-		KafkaTopic:       config.KafkaTopic,
+		KafkaTopic:       config.KafkaTopicPrefix + *nodeName,
 	}
 
 	mnode, err := node.NewDataNode(cfg)

@@ -16,7 +16,7 @@ func TestDatanode(t *testing.T) {
 	//	os.RemoveAll(path.Join([]string{FILE_LOCATION, d.Name()}...))
 	//}
 
-	writer, err := common_journal.NewWriter(KafkaServer, KafkaTopic)
+	writer, err := common_journal.NewWriter(KafkaServer, KafkaTopicPrefix)
 	if err != nil {
 		log.Fatal(err)
 	}
