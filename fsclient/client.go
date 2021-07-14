@@ -54,7 +54,7 @@ func (c *Client) Create(ctx context.Context, name string) (f *File, err error) {
 
 	switch reply.Status {
 	case fsrpc.Status_OK:
-		return newFile(reply.Fd, c), nil
+		return newFile(reply.Fd, name, c), nil
 	case fsrpc.Status_Exist:
 		return nil, fs.ErrExist
 	default:
@@ -114,7 +114,7 @@ func (c *Client) Open(ctx context.Context, name string) (f *File, err error) {
 
 	switch reply.Status {
 	case fsrpc.Status_OK: // open correctly
-		return newFile(reply.Fd, c), err
+		return newFile(reply.Fd, name, c), err
 	case fsrpc.Status_NotFound: // not found
 		return nil, fs.ErrNotExist
 	default: // should never reach here

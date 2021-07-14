@@ -10,12 +10,13 @@ import (
 )
 
 type File struct {
-	fd     uint64
-	client *Client
+	fd       uint64
+	filename string
+	client   *Client
 }
 
-func newFile(fd uint64, client *Client) *File {
-	return &File{fd: fd, client: client}
+func newFile(fd uint64, filename string, client *Client) *File {
+	return &File{fd: fd, filename: filename, client: client}
 }
 
 /*
