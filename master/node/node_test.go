@@ -40,6 +40,7 @@ func newTestNode(id string, port uint, caddr string) (*testNode, error) {
 		KafkaTopic:         config.KafkaTopic,
 		DB:                 db,
 		CheckpointInterval: ckptInterval,
+		DataNodeGroups:     []string{"node1"},
 	}
 	mnode, err := NewMasterNode(cfg)
 	if err != nil {
@@ -97,6 +98,7 @@ func newSuccessorTestNode(id string, port uint, caddr string, db *gorm.DB) (*tes
 		KafkaTopic:         config.KafkaTopic,
 		DB:                 db,
 		CheckpointInterval: ckptInterval,
+		DataNodeGroups:     []string{"node1"},
 	}
 	mnode, err := NewMasterNode(cfg)
 	if err != nil {

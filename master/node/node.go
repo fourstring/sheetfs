@@ -28,6 +28,7 @@ type MasterNodeConfig struct {
 	KafkaTopic         string
 	DB                 *gorm.DB
 	CheckpointInterval time.Duration
+	DataNodeGroups     []string
 }
 
 type MasterNode struct {
@@ -56,7 +57,7 @@ func NewMasterNode(config *MasterNodeConfig) (*MasterNode, error) {
 	}
 	m.elector = elector
 
-	m.alloc = datanode_alloc.NewDataNodeAllocator()
+	m.alloc = datanode_alloc.NewDataNodeAllocatorWithGroups(config.DataNodeGroups)
 
 	jw, err := common_journal.NewWriter(config.KafkaServer, config.KafkaTopic)
 	if err != nil {
