@@ -5,12 +5,15 @@ import (
 	"github.com/fourstring/sheetfs/datanode/config"
 	"github.com/fourstring/sheetfs/datanode/node"
 	"log"
+	"strings"
 )
 
 var port = flag.Uint("p", 0, "port to listen on")
 var forClientAddress = flag.String("a", "", "address for client to connect to this node")
 var nodeId = flag.String("i", "", "ID of this node")
-var nodeName = flag.String("n", "", "name of this node, e.g node1")
+var nodeGroupName = flag.String("gn", "", "name of the node group, e.g node1")
+var zkServerList = flag.String("sl", "", "server address list split by ';', e.g addr1;addr2;addr3")
+var electionPrefix = flag.String("ep", "", "election prefix")
 
 func main() {
 	flag.Parse()
@@ -19,13 +22,14 @@ func main() {
 		NodeID:           *nodeId,
 		Port:             *port,
 		ForClientAddr:    *forClientAddress,
-		ZookeeperServers: config.ElectionServers,
+		ElectionPrefix:   *electionPrefix,
+		DataDirPath:      config.DIR_DATA_PATH,
+		ZookeeperServers: strings.Split(*zkServerList, ";"),
 		ZookeeperTimeout: config.ElectionTimeout,
-		ElectionZnode:    config.ElectionZnodePrefix + *nodeName,
-		ElectionPrefix:   config.ElectionPrefix,
-		ElectionAck:      config.ElectionAckPrefix + *nodeName,
+		ElectionZnode:    config.ElectionZnodePrefix + *nodeGroupName,
+		ElectionAck:      config.ElectionAckPrefix + *nodeGroupName,
 		KafkaServer:      config.KafkaServer,
-		KafkaTopic:       config.KafkaTopicPrefix + *nodeName,
+		KafkaTopic:       config.KafkaTopicPrefix + *nodeGroupName,
 	}
 
 	mnode, err := node.NewDataNode(cfg)

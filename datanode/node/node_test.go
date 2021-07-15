@@ -23,16 +23,16 @@ func (t *testNode) RPC() *server.Server {
 	return t.node.rpcsrv
 }
 
-func newTestNode(id string, port uint, caddr string, name string) (*testNode, error) {
+func newTestNode(id string, port uint, caddr string, name string, serverList []string, electionPrefix string) (*testNode, error) {
 	cfg := &DataNodeConfig{
 		NodeID:           id,
 		Port:             port,
 		ForClientAddr:    caddr,
+		ZookeeperServers: serverList,
 		DataDirPath:      config.DIR_DATA_PATH,
-		ZookeeperServers: config.ElectionServers,
 		ZookeeperTimeout: config.ElectionTimeout,
 		ElectionZnode:    config.ElectionZnodePrefix + name,
-		ElectionPrefix:   config.ElectionPrefix,
+		ElectionPrefix:   electionPrefix,
 		ElectionAck:      config.ElectionAckPrefix + name,
 		KafkaServer:      config.KafkaServer,
 		KafkaTopic:       config.KafkaTopicPrefix + name,
@@ -50,13 +50,14 @@ func newTestNode(id string, port uint, caddr string, name string) (*testNode, er
 	return &testNode{node: mnode, cfg: cfg}, nil
 }
 
-func newTestNodesSet(startPort uint, num int) (map[string]*testNode, error) {
+func newTestNodesSet(startPort uint, num int, electionServers []string) (map[string]*testNode, error) {
 	set := map[string]*testNode{}
+	electionPrefix := "4da1fce7-d3f8-42dd-965d-4c3311661202-n_"
 	for i := 0; i < num; i++ {
 		port := startPort + uint(i)
 		id := fmt.Sprintf("dnode%d", i)
 		caddr := fmt.Sprintf("127.0.0.1:%d", port)
-		n, err := newTestNode(id, port, caddr, "node1")
+		n, err := newTestNode(id, port, caddr, "node1", electionServers, electionPrefix)
 		if err != nil {
 			return nil, err
 		}
@@ -127,14 +128,19 @@ func TestDataNodeReplication(t *testing.T) {
 	offset := uint64(0)
 	version := uint64(1) // first version return by master should be 1
 	data := []byte("this is the test data.")
+	var electionServers = []string{
+		"127.0.0.1:2181",
+		"127.0.0.1:2182",
+		"127.0.0.1:2183",
+	}
 
 	Convey("Construct test nodes", t, func() {
 		// construct node set
-		nodesSet, err := newTestNodesSet(9375, 3)
+		nodesSet, err := newTestNodesSet(9375, 3, electionServers)
 		So(err, ShouldBeNil)
 
 		// connect to servers
-		zkConn, _, err := zk.Connect(config.ElectionServers, config.ElectionTimeout)
+		zkConn, _, err := zk.Connect(electionServers, config.ElectionTimeout)
 		So(err, ShouldBeNil)
 
 		// get the primary node and secondary node list
