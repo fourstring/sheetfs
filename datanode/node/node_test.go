@@ -116,7 +116,7 @@ func verifySecondary(secondary *testNode, id uint64, offset uint64, version uint
 		Id:      id,
 		Offset:  offset,
 		Size:    config.BLOCK_SIZE,
-		Version: version + 1,
+		Version: version, // read will not increase the version
 	})
 	So(err, ShouldBeNil)
 	So(rep.Status, ShouldEqual, fs_rpc.Status_OK)

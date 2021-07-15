@@ -9,6 +9,22 @@ import (
 
 /* private functions */
 
+func MIN(a uint64, b uint64) uint64 {
+	if a < b {
+		return a
+	} else {
+		return b
+	}
+}
+
+func TargetSizeWrapper(targetSize uint64) uint64 {
+	if targetSize == uint64(0) {
+		// the targetSize is BLOCK SIZE
+		return config.BLOCK_SIZE
+	}
+	return targetSize
+}
+
 func Uint64ToBytes(i uint64) []byte {
 	var buf = make([]byte, 8)
 	binary.BigEndian.PutUint64(buf, i)
@@ -29,35 +45,34 @@ func BytesToUint32(buf []byte) uint32 {
 	return binary.BigEndian.Uint32(buf)
 }
 
-func GetPaddedData(data []byte, size uint64, padding string) []byte {
+func GetPaddedData(data []byte, size uint64, targetSize uint64, padding string) []byte {
 	// Fill padding with padByte.
 	var paddedData []byte
-	//switch padding {
-	//case " ":
-	//	copy(paddedData, buffermanager.blankBlock)
-	//	break
-	//default:
-	//	getPaddedBytes(padding, config.BLOCK_SIZE)
-	//}
-	paddedData = buffmgr.GetPaddedBytes(padding, config.BLOCK_SIZE)
 
-	copy(paddedData[:size+1], data)
+	// should trunc the data
+	print("TargetSizeWrapper: ", TargetSizeWrapper(targetSize))
+	writtenSize := MIN(size, TargetSizeWrapper(targetSize))
+
+	paddedData = buffmgr.GetPaddedBytes(padding, TargetSizeWrapper(targetSize))
+
+	copy(paddedData[:writtenSize], data)
 	return paddedData
 }
 
-func GetPaddedFile(data []byte, size uint64, padding string, offset uint64) []byte {
+func GetPaddedFile(data []byte, size uint64, targetSize uint64, padding string, offset uint64) []byte {
 	// Fill padding with padByte.
 	var paddedData []byte
-	//switch padding {
-	//case " ":
-	//	copy(paddedData, buffermanager.blankFile)
-	//	break
-	//default:
-	//	getPaddedBytes(padding, config.FILE_SIZE)
-	//}
 	paddedData = buffmgr.GetPaddedBytes(padding, config.FILE_SIZE)
 
-	copy(paddedData[offset:offset+size+1], data)
+	if targetSize == 0 {
+		// the targetSize is BLOCK SIZE
+		targetSize = config.BLOCK_SIZE
+	}
+
+	// should trunc the data
+	writtenSize := MIN(size, targetSize)
+
+	copy(paddedData[offset:offset+writtenSize], data)
 	return paddedData
 }
 

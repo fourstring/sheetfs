@@ -101,8 +101,11 @@ func (s *Server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 	reply := new(fsrpc.WriteChunkReply)
 	var err error
 
+	/* get the padded data first */
+	PaddedData := utils.GetPaddedData(request.Data, request.Size, request.TargetSize, request.Padding)
+
 	/* TODO: First write log to Kafka */
-	entry := journal.ConstructWriteEntry(request)
+	entry := journal.ConstructWriteEntry(request, PaddedData)
 	for i := 0; i < config.ACK_MOST_TIMES; i++ {
 		err = s.writer.CommitEntry(ctx, entry)
 		if err == nil {
@@ -134,7 +137,7 @@ func (s *Server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 			}
 			// write the data
 			_, err = file.WriteAt(utils.GetPaddedFile(request.Data, request.Size,
-				request.Padding, request.Offset), 0)
+				request.TargetSize, request.Padding, request.Offset), 0)
 			if err != nil {
 				reply.Status = fsrpc.Status_Unavailable
 				return reply, nil
@@ -154,8 +157,7 @@ func (s *Server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 	if curVersion+1 == request.Version {
 		// can update
 		// write the data
-		_, err := file.WriteAt(utils.GetPaddedData(request.Data, request.Size, request.Padding),
-			int64(request.Offset))
+		_, err := file.WriteAt(PaddedData, int64(request.Offset))
 		if err != nil {
 			file.Close()
 			reply.Status = fsrpc.Status_NotFound
@@ -199,8 +201,8 @@ func (s *Server) HandleWriteMsg(msg []byte) error {
 		}
 		for {
 			_, err = file.WriteAt(utils.GetPaddedFile(msg[36:], size,
-				" ", offset), 0)
-			if err != nil {
+				size, " ", offset), 0)
+			if err == nil {
 				break
 			}
 		}
@@ -218,8 +220,9 @@ func (s *Server) HandleWriteMsg(msg []byte) error {
 	}
 	dataCks := crc32.Checksum(oldData, config.Crc32q)
 
-	// if they have different checksum
-	if utils.BytesToUint32(msg[32:36]) != dataCks {
+	// if they have different checksum or different version
+	if utils.BytesToUint32(msg[32:36]) != dataCks ||
+		version != utils.GetVersion(file) {
 		// overwrite
 		for {
 			_, err = file.WriteAt(msg[36:], int64(offset))
@@ -227,6 +230,8 @@ func (s *Server) HandleWriteMsg(msg []byte) error {
 				break
 			}
 		}
+		// update the version
+		utils.SyncAndUpdateVersion(file, version)
 	}
 	return nil
 }
