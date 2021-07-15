@@ -134,7 +134,7 @@ func (s *Server) WriteChunk(ctx context.Context, request *fsrpc.WriteChunkReques
 			}
 			// write the data
 			_, err = file.WriteAt(utils.GetPaddedFile(request.Data, request.Size,
-				request.Padding, request.Offset), int64(request.Offset))
+				request.Padding, request.Offset), 0)
 			if err != nil {
 				reply.Status = fsrpc.Status_Unavailable
 				return reply, nil
@@ -198,8 +198,9 @@ func (s *Server) HandleWriteMsg(msg []byte) error {
 			}
 		}
 		for {
-			_, err = file.WriteAt(msg[36:], int64(offset))
-			if err == nil {
+			_, err = file.WriteAt(utils.GetPaddedFile(msg[36:], size,
+				" ", offset), 0)
+			if err != nil {
 				break
 			}
 		}
