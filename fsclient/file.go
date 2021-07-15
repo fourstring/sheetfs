@@ -10,12 +10,13 @@ import (
 )
 
 type File struct {
-	fd     uint64
-	client *Client
+	fd       uint64
+	filename string
+	client   *Client
 }
 
-func newFile(fd uint64, client *Client) *File {
-	return &File{fd: fd, client: client}
+func newFile(fd uint64, filename string, client *Client) *File {
+	return &File{fd: fd, filename: filename, client: client}
 }
 
 /*
@@ -42,8 +43,19 @@ func (f *File) Read(ctx context.Context) (b []byte, n int64, err error) {
 	masterReq := fsrpc.ReadSheetRequest{Fd: f.fd}
 	masterReply, err := f.client.masterClient.ReadSheet(ctx, &masterReq)
 
-	// check read reply
+	// RPC fail may arise by broken master client
 	if err != nil {
+		for i := 0; i < config.ACK_MOST_TIMES; i++ {
+			err := f.client.reAskMasterNode()
+			if err != nil {
+				continue
+			}
+			masterReply, err = f.client.masterClient.ReadSheet(ctx, &masterReq)
+			if err != nil {
+				continue
+			}
+			break // get the correct reply
+		}
 		return []byte{}, -1, err
 	}
 
@@ -132,12 +144,6 @@ func (f *File) Read(ctx context.Context) (b []byte, n int64, err error) {
 	wg.Wait()
 
 	// convert to JSON
-	// DynamicCopy(&b, connect(data, metaData))
-	//src := connect(data, metaData)
-	//for i := 0; i < len(b) && i < len(src); i++ {
-	//	b[i] = src[i]
-	//}
-	//b = append(b, src[len(b):]...)
 	res := connect(data, metaData)
 
 	return res, int64(len(res)), workerErr
@@ -171,9 +177,22 @@ func (f *File) ReadAt(ctx context.Context, b []byte, row uint32, col uint32) (n 
 	}
 	masterReply, err := f.client.masterClient.ReadCell(ctx, &masterReq)
 
+	// RPC fail may arise by broken master client
 	if err != nil {
+		for i := 0; i < config.ACK_MOST_TIMES; i++ {
+			err := f.client.reAskMasterNode()
+			if err != nil {
+				continue
+			}
+			masterReply, err = f.client.masterClient.ReadCell(ctx, &masterReq)
+			if err != nil {
+				continue
+			}
+			break // get the correct reply
+		}
 		return -1, err
 	}
+
 	if masterReply.Status != fsrpc.Status_OK {
 		// have fd so not found must due to some invalid para
 		return -1, NewUnexpectedStatusError(masterReply.Status)
@@ -195,6 +214,7 @@ func (f *File) ReadAt(ctx context.Context, b []byte, row uint32, col uint32) (n 
 		default:
 		}
 		dataReply, err := f.client.concurrentReadChunk(ctx, masterReply.Cell.Chunk, &dataReq)
+		// already do re-ask datanode server
 
 		if err != nil {
 			return -1, err
@@ -249,7 +269,19 @@ func (f *File) WriteAt(ctx context.Context, b []byte, row uint32, col uint32, pa
 	}
 	masterReply, err := f.client.masterClient.WriteCell(ctx, &masterReq)
 
+	// RPC fail may arise by broken master client
 	if err != nil {
+		for i := 0; i < config.ACK_MOST_TIMES; i++ {
+			err := f.client.reAskMasterNode()
+			if err != nil {
+				continue
+			}
+			masterReply, err = f.client.masterClient.WriteCell(ctx, &masterReq)
+			if err != nil {
+				continue
+			}
+			break // get the correct reply
+		}
 		return -1, err
 	}
 
@@ -259,6 +291,9 @@ func (f *File) WriteAt(ctx context.Context, b []byte, row uint32, col uint32, pa
 	case fsrpc.Status_OK:
 		// open correctly
 		version = masterReply.Cell.Chunk.Version
+	case fsrpc.Status_NotFound:
+		// not found, should let the client know
+		return -1, fs.ErrNotExist
 	default:
 		return -1, NewUnexpectedStatusError(masterReply.Status)
 	}
@@ -285,6 +320,7 @@ func (f *File) WriteAt(ctx context.Context, b []byte, row uint32, col uint32, pa
 		default:
 		}
 		dataReply, err := f.client.concurrentWriteChunk(ctx, masterReply.Cell.Chunk, &dataReq)
+		// already do re-ask datanode server
 
 		if err != nil {
 			return -1, err
