@@ -155,9 +155,10 @@ message WriteChunkRequest {
     uint64 id = 1;
     uint64 offset = 2;
     uint64 size = 3;
-    uint64 version = 4;
-    string padding = 5;
-    bytes data = 6;
+    uint64 target_size = 4;
+    uint64 version = 5;
+    string padding = 6;
+    bytes data = 7;
 }
 
 message WriteChunkReply {
