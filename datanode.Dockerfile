@@ -13,6 +13,8 @@ RUN go mod download
 COPY ./config ./config
 COPY ./datanode ./datanode
 COPY ./protocol ./protocol
+COPY ./common_journal ./common_journal
+COPY ./election ./election
 
 RUN cd datanode && go build
 

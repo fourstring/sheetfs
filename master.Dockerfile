@@ -12,6 +12,8 @@ RUN go mod download
 
 COPY ./master ./master
 COPY ./protocol ./protocol
+COPY ./common_journal ./common_journal
+COPY ./election ./election
 
 RUN cd master && go build
 

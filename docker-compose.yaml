@@ -9,7 +9,7 @@ services:
       - 8432:8432
     environment:
       MASTER_ADDR_FOR_CLIENT: "127.0.0.1:8432"
-      DATANODE_GROUPS:
+      DATANODE_GROUPS: group1,group2,group3
       ELECTION_ACK: /master-ack
       ELECTION_ZNODE: /master-election
       NODE_ID: master1
@@ -19,6 +19,11 @@ services:
       ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
     networks:
       - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
 
   master2:
     build:
@@ -28,7 +33,7 @@ services:
       - 8433:8432
     environment:
       MASTER_ADDR_FOR_CLIENT: "127.0.0.1:8433"
-      DATANODE_GROUPS:
+      DATANODE_GROUPS: group1,group2,group3
       ELECTION_ACK: /master-ack
       ELECTION_ZNODE: /master-election
       NODE_ID: master2
@@ -38,6 +43,11 @@ services:
       ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
     networks:
       - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
 
   master3:
     build:
@@ -47,7 +57,7 @@ services:
       - 8434:8432
     environment:
       MASTER_ADDR_FOR_CLIENT: "127.0.0.1:8434"
-      DATANODE_GROUPS:
+      DATANODE_GROUPS: group1,group2,group3
       ELECTION_ACK: /master-ack
       ELECTION_ZNODE: /master-election
       NODE_ID: master3
@@ -57,43 +67,194 @@ services:
       ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
     networks:
       - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
 
-  datanode1:
+  datanode-group1-1:
     build:
       dockerfile: "./datanode.Dockerfile"
       context: "."
     ports:
       - 9375:9375
     environment:
-      MASTER_ADDR: "master:8432"
       DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9375"
       DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group1-1"
+      GROUP_NAME: "group1"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
     networks:
       - sheetfs
-  datanode2:
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
+  datanode-group1-2:
     build:
       dockerfile: "./datanode.Dockerfile"
       context: "."
     ports:
       - 9376:9375
     environment:
-      MASTER_ADDR: "master:8432"
       DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9376"
       DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group1-2"
+      GROUP_NAME: "group1"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
     networks:
       - sheetfs
-  datanode3:
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
+  datanode-group1-3:
     build:
       dockerfile: "./datanode.Dockerfile"
       context: "."
     ports:
       - 9377:9375
     environment:
-      MASTER_ADDR: "master:8432"
       DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9377"
       DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group1-3"
+      GROUP_NAME: "group1"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
     networks:
       - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
+
+  datanode-group2-1:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9378:9375
+    environment:
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9378"
+      DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group2-1"
+      GROUP_NAME: "group2"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
+    networks:
+      - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
+  datanode-group2-2:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9379:9375
+    environment:
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9379"
+      DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group2-2"
+      GROUP_NAME: "group2"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
+    networks:
+      - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
+  datanode-group2-3:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9380:9375
+    environment:
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9380"
+      DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group2-3"
+      GROUP_NAME: "group2"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
+    networks:
+      - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
+
+  datanode-group3-1:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9381:9375
+    environment:
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9381"
+      DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group3-1"
+      GROUP_NAME: "group3"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
+    networks:
+      - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
+  datanode-group3-2:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9382:9375
+    environment:
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9382"
+      DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group3-2"
+      GROUP_NAME: "group3"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
+    networks:
+      - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
+  datanode-group3-3:
+    build:
+      dockerfile: "./datanode.Dockerfile"
+      context: "."
+    ports:
+      - 9383:9375
+    environment:
+      DATANODE_ADDR_FOR_CLIENT: "127.0.0.1:9383"
+      DATANODE_PORT: "9375"
+      NODE_ID: "datanode-group3-3"
+      GROUP_NAME: "group3"
+      ZOOKEEPER_SERVERS: zoo1:2181,zoo2:2181,zoo3:2181
+      KAFKA_SERVER: kafka:9093
+    networks:
+      - sheetfs
+    depends_on:
+      - zoo1
+      - zoo2
+      - zoo3
+      - kafka
 
   zoo1:
     image: zookeeper
@@ -143,7 +304,7 @@ services:
       KAFKA_CFG_NUM_PARTITIONS: 1
       KAFKA_CFG_LISTENER_SECURITY_PROTOCOL_MAP: CLIENT:PLAINTEXT,EXTERNAL:PLAINTEXT
       KAFKA_CFG_LISTENERS: CLIENT://:9092,EXTERNAL://:9093
-      KAFKA_CFG_ADVERTISED_LISTENERS: CLIENT://kafka:9092,EXTERNAL://localhost:9093
+      KAFKA_CFG_ADVERTISED_LISTENERS: CLIENT://kafka:9092,EXTERNAL://kafka:9093
       KAFKA_INTER_BROKER_LISTENER_NAME: CLIENT
     depends_on:
       - zoo1
