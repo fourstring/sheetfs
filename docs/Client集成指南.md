@@ -2,23 +2,30 @@
 
 ## 0. Release地址
 
-https://github.com/fourstring/sheetfs/releases/tag/v0.2.1
+https://github.com/fourstring/sheetfs/releases/tag/v1.0.0
 
 ## 1.添加依赖
 
 在后端根目录下执行：
 
 ```bash
-go get github.com/fourstring/sheetfs@v0.2.1
+go get github.com/fourstring/sheetfs@v1.0.0
 ```
 
 ## 2. API
 
-详细Reference见https://pkg.go.dev/github.com/fourstring/sheetfs@v0.2.1/fsclient
+详细Reference见https://pkg.go.dev/github.com/fourstring/sheetfs@v1.0.0/fsclient
 
 ```go
 func main() {
-    c, err := fsclient.NewClient("127.0.0.1:8432")
+    cfg := &fsclient.ClientConfig{
+        ZookeeperServers:    []string{"zoo1:2181","zoo2:2181","zoo3:2181"},
+        ZookeeperTimeout:    10 * time.Second,
+        MasterZnode:         "/master-ack",
+        DataNodeZnodePrefix: "/datanode_election_ack_",
+        MaxRetry:            10,
+    }
+    c, err := fsclient.NewClient(cfg)
     if err != nil {
         log.Fatal(err)
     }
@@ -59,7 +66,7 @@ switch err.(type) {
 ```bash
 git clone https://github.com/fourstring/sheetfs
 cd sheetfs
-git checkout v0.2.1
+git checkout v1.0.0
 ```
 
 然后安装docker-compose:
@@ -69,11 +76,5 @@ pip3 install docker-compose
 docker-compose up -d
 ```
 
-docker-compose将会自动构建镜像并启动服务容器，包括一个MasterNode和3个DataNode。启动后，目前MasterNode监听在本地`8432`端口，3个DataNode分别监听在本地`9375`,`9376`,`9377`端口。后端调用:
-
-```go
-c, err:=fsclient.NewClient("127.0.0.1:8432")
-```
-
-即可连接。
+docker-compose将会自动构建镜像并启动服务容器. Client从Zookeeper服务器取得选举结果，无需手动指定服务端地址。docker-compose启动的Zookeeper监听在宿主机`2181-2183`端口，若应用和文件系统位于同一docker网络内，则可以使用`zoo1:2181,zoo2:2181,zoo3:2181`。
 

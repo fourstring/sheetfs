@@ -12,6 +12,7 @@ This project is composed of several top-level packages:
 * `protocol`: defines gRPC protocol between the client and nodes of filesystem.
 * `election`: encapsulates common election algorithms using Zookeeper
 * `common_journal`: common journaling support for replication in a cluster using Kafka
+* `tests`: testing utils and integration tests.
 
 ## Deployment
 Currently, this project can be deployed using `docker-compose`. Example dockerfile and docker-compose configuration are provided under the root directory of the project. However, Kubernetes support is poor now.
