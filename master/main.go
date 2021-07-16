@@ -24,7 +24,7 @@ func parseCommaList(l string) []string {
 
 func main() {
 	flag.Parse()
-	db, err := connectDB()
+	db, err := connectDB(*nodeId)
 	if err != nil {
 		log.Fatal(err)
 	}
@@ -43,6 +43,7 @@ func main() {
 		CheckpointInterval: config.CheckpointInterval,
 		DataNodeGroups:     parseCommaList(*dataNodeGroups),
 	}
+	log.Printf("%v\n", cfg)
 	mnode, err := node.NewMasterNode(cfg)
 	if err != nil {
 		log.Fatal(err)

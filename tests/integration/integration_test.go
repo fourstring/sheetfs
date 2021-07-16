@@ -1,16 +1,31 @@
-package tests
+package integration
 
 import (
 	stdctx "context"
 	"fmt"
 	"github.com/fourstring/sheetfs/fsclient"
 	. "github.com/smartystreets/goconvey/convey"
+	"os"
 	"sync"
 	"testing"
+	"time"
 )
 
 var ctx = stdctx.Background()
-var masterAddr = "127.0.0.1:8432"
+var ElectionServers = []string{
+	"127.0.0.1:2181",
+	"127.0.0.1:2182",
+	"127.0.0.1:2183",
+}
+var MasterAck = "/master-election-ack"
+var DatnodeAckPrefix = "/datanode_election_ack_"
+var cfg = &fsclient.ClientConfig{
+	ZookeeperServers:    ElectionServers,
+	ZookeeperTimeout:    10 * time.Second,
+	MasterZnode:         MasterAck,
+	DataNodeZnodePrefix: DatnodeAckPrefix,
+	MaxRetry:            10,
+}
 
 func constructData(col uint32, row uint32) []byte {
 	return []byte("{\n" +
@@ -26,7 +41,7 @@ func constructData(col uint32, row uint32) []byte {
 
 func TestCreate(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := fsclient.NewClient(masterAddr)
+		c, err := fsclient.NewClient(cfg)
 		So(err, ShouldBeNil)
 		Convey("Create test file", func() {
 			_, err := c.Create(ctx, "test file")
@@ -37,7 +52,7 @@ func TestCreate(t *testing.T) {
 
 func TestOpen(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := fsclient.NewClient(masterAddr)
+		c, err := fsclient.NewClient(cfg)
 		So(err, ShouldBeNil)
 		Convey("Open exist test file", func() {
 			c.Create(ctx, "test file")
@@ -53,23 +68,9 @@ func TestOpen(t *testing.T) {
 	})
 }
 
-func TestDelete(t *testing.T) {
-	Convey("Start test servers", t, func() {
-		_, err := fsclient.NewClient(masterAddr)
-		So(err, ShouldBeNil)
-		Convey("Delete test file", func() {
-			// TODO
-		})
-
-		Convey("Delete non-exist test file", func() {
-			// TODO
-		})
-	})
-}
-
 func TestReadAndWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := fsclient.NewClient(masterAddr)
+		c, err := fsclient.NewClient(cfg)
 		So(err, ShouldBeNil)
 
 		// var file File
@@ -98,7 +99,7 @@ func TestReadAndWrite(t *testing.T) {
 
 func TestComplicatedReadAndWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := fsclient.NewClient(masterAddr)
+		c, err := fsclient.NewClient(cfg)
 		So(err, ShouldBeNil)
 
 		// var file File
@@ -122,7 +123,7 @@ func TestComplicatedReadAndWrite(t *testing.T) {
 
 func TestConcurrentWrite(t *testing.T) {
 	Convey("Start test servers", t, func() {
-		c, err := fsclient.NewClient(masterAddr)
+		c, err := fsclient.NewClient(cfg)
 		So(err, ShouldBeNil)
 
 		// var file File
@@ -150,6 +151,61 @@ func TestConcurrentWrite(t *testing.T) {
 			read, size, err := file.Read(ctx) // must call this before write
 			So(len(read), ShouldEqual, size)
 			So(err, ShouldBeNil)
+		})
+	})
+}
+
+func TestHandleCrash(t *testing.T) {
+	Convey("Start test servers", t, func() {
+		c, err := fsclient.NewClient(cfg)
+		So(err, ShouldBeNil)
+
+		// var file File
+		Convey("Read empty file after create", func(conveyC C) {
+			file, err := c.Create(ctx, "test file")
+			So(err, ShouldBeNil)
+			file.Read(ctx) // must call this before write
+
+			// read := make([]byte, 1024)
+			var wg sync.WaitGroup
+			for row := 0; row < 5; row++ {
+				for col := 0; col < 10; col++ {
+					row := row
+					col := col
+					wg.Add(1)
+					go func() {
+						b := constructData(uint32(row), uint32(col))
+						file.WriteAt(ctx, b, uint32(row), uint32(col), " ")
+						wg.Done()
+					}()
+				}
+			}
+			wg.Wait()
+			os.Stdout.Write([]byte("Please crash datanodes!\n"))
+			os.Stdout.Sync()
+			buf := make([]byte, 1)
+			os.Stdin.Read(buf)
+			for row := 5; row < 10; row++ {
+				for col := 0; col < 10; col++ {
+					row := row
+					col := col
+					wg.Add(1)
+					go func() {
+						b := constructData(uint32(row), uint32(col))
+						file.WriteAt(ctx, b, uint32(row), uint32(col), " ")
+						wg.Done()
+					}()
+				}
+			}
+			wg.Wait()
+			os.Stdout.Write([]byte("Please crash datanodes and master!\n"))
+			os.Stdout.Sync()
+			buf = make([]byte, 1)
+			os.Stdin.Read(buf)
+			read, size, err := file.Read(ctx) // must call this before write
+			So(len(read), ShouldEqual, size)
+			So(err, ShouldBeNil)
+			So(size, ShouldBeGreaterThanOrEqualTo, 100/4*8192)
 		})
 	})
 }

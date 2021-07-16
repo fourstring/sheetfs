@@ -1,2 +1,2 @@
 #!/bin/sh
-./datanode -a "$DATANODE_ADDR_FOR_CLIENT" -m "$MASTER_ADDR" -d "/tmp" -p "$DATANODE_PORT"
+./datanode -a "$DATANODE_ADDR_FOR_CLIENT" -p "$DATANODE_PORT" -i "$NODE_ID" -gn "$GROUP_NAME" -sl "$ZOOKEEPER_SERVERS" -ks "$KAFKA_SERVER"

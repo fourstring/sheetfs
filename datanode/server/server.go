@@ -209,6 +209,7 @@ func (s *Server) HandleWriteMsg(msg []byte) error {
 
 		// the version is newest
 		utils.SyncAndUpdateVersion(file, version)
+		return nil
 	}
 
 	// the file already exist

@@ -1,7 +1,7 @@
 package main
 
 import (
-	"github.com/fourstring/sheetfs/master/config"
+	"fmt"
 	"github.com/fourstring/sheetfs/master/filemgr/mgr_entry"
 	"github.com/fourstring/sheetfs/master/journal/checkpoint"
 	"github.com/fourstring/sheetfs/master/sheetfile"
@@ -9,8 +9,8 @@ import (
 	"gorm.io/gorm"
 )
 
-func connectDB() (*gorm.DB, error) {
-	db, err := gorm.Open(sqlite.Open(config.DBName), &gorm.Config{})
+func connectDB(nodeId string) (*gorm.DB, error) {
+	db, err := gorm.Open(sqlite.Open(fmt.Sprintf("%s.db", nodeId)), &gorm.Config{})
 	if err != nil {
 		return nil, err
 	}

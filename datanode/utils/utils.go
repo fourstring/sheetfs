@@ -50,7 +50,6 @@ func GetPaddedData(data []byte, size uint64, targetSize uint64, padding string) 
 	var paddedData []byte
 
 	// should trunc the data
-	print("TargetSizeWrapper: ", TargetSizeWrapper(targetSize))
 	writtenSize := MIN(size, TargetSizeWrapper(targetSize))
 
 	paddedData = buffmgr.GetPaddedBytes(padding, TargetSizeWrapper(targetSize))

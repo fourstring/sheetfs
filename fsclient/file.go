@@ -41,25 +41,20 @@ spin until it success or cancelled by ctx, so ctx is generally necessary.
 func (f *File) Read(ctx context.Context) (b []byte, n int64, err error) {
 	// read whole sheet
 	masterReq := fsrpc.ReadSheetRequest{Fd: f.fd}
-	masterReply, err := f.client.masterClient.ReadSheet(ctx, &masterReq)
+	// masterReply, err := f.client.master.ReadSheet(ctx, &masterReq)
+	_r, err := f.client.ensureMasterRPCWithRetry("ReadSheet", ctx, &masterReq)
 
 	// RPC fail may arise by broken master client
 	if err != nil {
-		for i := 0; i < config.ACK_MOST_TIMES; i++ {
-			err := f.client.reAskMasterNode()
-			if err != nil {
-				continue
-			}
-			masterReply, err = f.client.masterClient.ReadSheet(ctx, &masterReq)
-			if err != nil {
-				continue
-			}
-			break // get the correct reply
-		}
 		return []byte{}, -1, err
 	}
 
-	f.client.checkNewDataNode(masterReply.Chunks)
+	masterReply := _r.(*fsrpc.ReadSheetReply)
+
+	err = f.client.checkNewDataNode(masterReply.Chunks)
+	if err != nil {
+		return nil, -1, err
+	}
 	switch masterReply.Status {
 	case fsrpc.Status_OK:
 	case fsrpc.Status_NotFound:
@@ -175,30 +170,25 @@ func (f *File) ReadAt(ctx context.Context, b []byte, row uint32, col uint32) (n 
 		Row:    row,
 		Column: col,
 	}
-	masterReply, err := f.client.masterClient.ReadCell(ctx, &masterReq)
+	//masterReply, err := f.client.master.ReadCell(ctx, &masterReq)
+	_r, err := f.client.ensureMasterRPCWithRetry("ReadCell", ctx, &masterReq)
 
 	// RPC fail may arise by broken master client
 	if err != nil {
-		for i := 0; i < config.ACK_MOST_TIMES; i++ {
-			err := f.client.reAskMasterNode()
-			if err != nil {
-				continue
-			}
-			masterReply, err = f.client.masterClient.ReadCell(ctx, &masterReq)
-			if err != nil {
-				continue
-			}
-			break // get the correct reply
-		}
 		return -1, err
 	}
+
+	masterReply := _r.(*fsrpc.ReadCellReply)
 
 	if masterReply.Status != fsrpc.Status_OK {
 		// have fd so not found must due to some invalid para
 		return -1, NewUnexpectedStatusError(masterReply.Status)
 	}
 
-	f.client.checkNewDataNode([]*fsrpc.Chunk{masterReply.Cell.Chunk})
+	err = f.client.checkNewDataNode([]*fsrpc.Chunk{masterReply.Cell.Chunk})
+	if err != nil {
+		return -1, err
+	}
 
 	// use metadata to read chunk
 	dataReq := fsrpc.ReadChunkRequest{
@@ -267,24 +257,15 @@ func (f *File) WriteAt(ctx context.Context, b []byte, row uint32, col uint32, pa
 		Row:    row,
 		Column: col,
 	}
-	masterReply, err := f.client.masterClient.WriteCell(ctx, &masterReq)
+	//masterReply, err := f.client.master.WriteCell(ctx, &masterReq)
+	_r, err := f.client.ensureMasterRPCWithRetry("WriteCell", ctx, &masterReq)
 
 	// RPC fail may arise by broken master client
 	if err != nil {
-		for i := 0; i < config.ACK_MOST_TIMES; i++ {
-			err := f.client.reAskMasterNode()
-			if err != nil {
-				continue
-			}
-			masterReply, err = f.client.masterClient.WriteCell(ctx, &masterReq)
-			if err != nil {
-				continue
-			}
-			break // get the correct reply
-		}
 		return -1, err
 	}
 
+	masterReply := _r.(*fsrpc.WriteCellReply)
 	// get the correct version
 	var version uint64
 	switch masterReply.Status {
@@ -298,20 +279,28 @@ func (f *File) WriteAt(ctx context.Context, b []byte, row uint32, col uint32, pa
 		return -1, NewUnexpectedStatusError(masterReply.Status)
 	}
 
-	f.client.checkNewDataNode([]*fsrpc.Chunk{masterReply.Cell.Chunk})
+	err = f.client.checkNewDataNode([]*fsrpc.Chunk{masterReply.Cell.Chunk})
+	if err != nil {
+		return -1, err
+	}
 	// if padding is empty
 	if len(padding) == 0 {
 		padding = " "
 	}
 
+	targetSize := uint64(config.BLOCK_SIZE)
+	if row == MetaCellRow && col == MetaCellCol {
+		targetSize = uint64(config.FILE_SIZE)
+	}
 	// use metadata to read chunk
 	dataReq := fsrpc.WriteChunkRequest{
-		Id:      masterReply.Cell.Chunk.Id,
-		Offset:  masterReply.Cell.Offset,
-		Size:    uint64(len(b)),
-		Version: version,
-		Padding: padding,
-		Data:    b,
+		Id:         masterReply.Cell.Chunk.Id,
+		Offset:     masterReply.Cell.Offset,
+		Size:       uint64(len(b)),
+		TargetSize: targetSize,
+		Version:    version,
+		Padding:    padding,
+		Data:       b,
 	}
 	for {
 		select {
